@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.turbo/
+.DS_Store
+*.log
+.env
+.env.local
+coverage/
+*.tsbuildinfo
+
+# Defensive — redundant with the rules above but makes intent obvious
+packages/*/dist/
+packages/*/*.tsbuildinfo
+.artifacts/
