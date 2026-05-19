@@ -9,6 +9,14 @@
     "node": ">=18"
   },
   "packageManager": "pnpm@11.0.8",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zhengyanglsun/iflow-search-js.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zhengyanglsun/iflow-search-js/issues"
+  },
+  "homepage": "https://github.com/zhengyanglsun/iflow-search-js#readme",
   "scripts": {
     "build": "pnpm -r run build",
     "test": "pnpm -r run test",
