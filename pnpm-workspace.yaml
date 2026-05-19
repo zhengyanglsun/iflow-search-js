@@ -1,4 +1,7 @@
 packages:
   - "packages/*"
+  - "examples/*"
 allowBuilds:
   esbuild: true
+overrides:
+  "@langchain/core": "^1.1.44"
