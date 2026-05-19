@@ -131,6 +131,14 @@ LangGraph traffic shows up as `IFlow-Source: langchain` because it consumes the 
 - **P4** 🟡 docs and examples polish — broader recipes, additional LLM providers
 - **P5** optional — refactor the OpenClaw community iFlow plugin to reuse `@iflow-ai/search-core`
 
+## Maintenance and roadmap
+
+Long-form docs for maintainers and contributors live under [`docs/`](./docs):
+
+- [`docs/package-strategy.md`](./docs/package-strategy.md) — which npm packages we publish, which we explicitly will not, and the decision rubric for new ones.
+- [`docs/integration-roadmap.md`](./docs/integration-roadmap.md) — how each framework (LangChain, LangGraph, OpenClaw, Hermes, Claude Code, iFlow CLI, Open WebUI, Coze, CrewAI) reaches iFlow Search, with phased execution order.
+- [`docs/release-policy.md`](./docs/release-policy.md) — versioning, `next` vs `latest`, the per-release checklist, and the manual publish commands.
+
 ## License
 
 MIT — see [LICENSE](./LICENSE).
