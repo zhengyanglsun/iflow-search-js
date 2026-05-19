@@ -4,6 +4,8 @@ LangChain JS tool factories for the [iFlow Search API](https://platform.iflow.cn
 
 Built on top of [`@iflow-ai/search-core`](../search-core). Works with LangChain JS agents and LangGraph (since LangGraph consumes LangChain tools directly).
 
+LangGraph users: there is intentionally no separate `@iflow-ai/search-langgraph` package — pass these tools straight into `createReactAgent` / `ToolNode`. See [`examples/langgraph-agent`](../../examples/langgraph-agent) for an end-to-end ReAct example.
+
 ## Install
 
 ```bash
