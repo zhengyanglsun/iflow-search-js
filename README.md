@@ -138,6 +138,7 @@ Long-form docs for maintainers and contributors live under [`docs/`](./docs):
 - [`docs/package-strategy.md`](./docs/package-strategy.md) — which npm packages we publish, which we explicitly will not, and the decision rubric for new ones.
 - [`docs/integration-roadmap.md`](./docs/integration-roadmap.md) — how each framework (LangChain, LangGraph, OpenClaw, Hermes, Claude Code, iFlow CLI, Open WebUI, Coze, CrewAI) reaches iFlow Search, with phased execution order.
 - [`docs/release-policy.md`](./docs/release-policy.md) — versioning, `next` vs `latest`, the per-release checklist, and the manual publish commands.
+- [`docs/mcp-design.md`](./docs/mcp-design.md) — design for the planned `@iflow-ai/search-mcp` server (P3): package decision, transport scope, tool schema, attribution headers, MCP client config example, and test strategy.
 
 ## License
 

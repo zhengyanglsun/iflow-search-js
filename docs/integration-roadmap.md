@@ -37,11 +37,13 @@ The phases below are the order we intend to ship work in. They are not deadlines
 
 ### Phase 3 — `@iflow-ai/search-mcp`
 
+- **Design document** lives at [`mcp-design.md`](./mcp-design.md) — package name, transport scope, tool schema, attribution headers, CLI entry, MCP client config example, and test strategy are all pinned there. Read that before implementation begins.
 - Implement the MCP server in this monorepo under `packages/search-mcp`.
 - Cover Hermes Agent, Claude Code, Claude Desktop, and any other MCP client in a single package.
+- **MVP transport is stdio only.** Streamable HTTP is deferred until a concrete remote-deployment use case lands (see `mcp-design.md` §3).
 - Validate against at least two MCP clients before publishing.
 
-**Exit criteria:** MCP server published to `next`, working stdio + SSE transports, validated against ≥ 2 clients.
+**Exit criteria:** MCP server published to `next`, working stdio transport, validated against ≥ 2 clients (recommended pair: Claude Code + Claude Desktop), unit + protocol smoke + real-API smoke all green.
 
 ### Phase 4 — Open WebUI / Coze / CrewAI
 
