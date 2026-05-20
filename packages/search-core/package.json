@@ -1,6 +1,6 @@
 {
   "name": "@iflow-ai/search-core",
-  "version": "0.1.0-pre.0",
+  "version": "0.1.0-pre.1",
   "description": "Framework-agnostic SDK for the iFlow Search API (web search, image search, web fetch). Zero runtime dependencies.",
   "license": "MIT",
   "type": "module",
