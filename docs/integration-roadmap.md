@@ -19,7 +19,7 @@ All upstream integration / docs requests filed by this project are filed by the 
 | **LangChain JS** | `@iflow-ai/search-langchain` tools wired into any LangChain agent that supports `bindTools` | Yes — already published | `0.1.0-pre.0` on dist-tag `next` | Three tools: `iflow_web_search`, `iflow_image_search`, `iflow_web_fetch`. Peer-depends on `@langchain/core` `^0.3.0 \|\| ^1.0.0` and `zod` `^3.25.0 \|\| ^4.0.0`. | <https://js.langchain.com/docs/> · <https://js.langchain.com/docs/concepts/tools/> |
 | **LangGraph JS** | Reuse `@iflow-ai/search-langchain` tools inside `createReactAgent` / `ToolNode` | No separate package | `examples/langgraph-agent` end-to-end ReAct example validated against real iFlow | A `@iflow-ai/search-langgraph` package would be a re-export — explicitly rejected. Workspace pins `@langchain/core` to `^1.1.44` via `pnpm-workspace.yaml` overrides to avoid `ToolMessage` cross-version bugs. | <https://langchain-ai.github.io/langgraphjs/> |
 | **OpenClaw / ClawHub** | `@iflow-ai/iflow-plugin` (separate repo, separate release) | Yes — maintained outside this monorepo | Already shipping | A future internal refactor can let the plugin consume `@iflow-ai/search-core` to delete duplicated HTTP code. Do **not** create `@iflow-ai/search-openclaw`. | <https://clawhub.ai/> · <https://docs.openclaw.ai/plugins/building-plugins> · <https://github.com/openclaw/openclaw/issues/83522> |
-| **Hermes Agent** | Planned `@iflow-ai/search-mcp` server | Yes (planned, single MCP package) | Not implemented | Hermes is an MCP client. A Hermes-specific package would lock us to Hermes' release cycle — rejected. | <https://modelcontextprotocol.io/> |
+| **Hermes Agent** | `@iflow-ai/search-mcp` server over stdio | Yes — `@iflow-ai/search-mcp@0.1.0-pre.0` on dist-tag `next` | ✅ Smoke green end-to-end — Hermes is the first verified MCP client. See Phase 3 verification record. | Hermes is an MCP client. A Hermes-specific package would lock us to Hermes' release cycle — rejected. | <https://modelcontextprotocol.io/> · <https://github.com/NousResearch/hermes-agent/issues/29250> |
 | **Claude Code** | Planned `@iflow-ai/search-mcp` server, or a published skill | Yes (planned, same MCP package) | Not implemented | MCP is the first-class extension surface for Claude Code. No Claude-Code-specific npm package. | <https://docs.anthropic.com/en/docs/claude-code> · <https://docs.anthropic.com/en/docs/claude-code/mcp> · <https://modelcontextprotocol.io/> |
 | **iFlow CLI** | Direct dependency on `@iflow-ai/search-core` if/when the CLI is a published Node app | Maybe — only if the CLI itself ships as an npm product | Internal use only today | Internal CLIs can take a workspace dependency; no need to publish a CLI-specific adapter. | — |
 | **Open WebUI** | OpenAPI tool spec, or the planned MCP server | No | Not started | Open WebUI's first-class extension surfaces are OpenAPI tools and MCP. We ship a spec / server, not a UI-specific npm package. | <https://docs.openwebui.com/> · <https://spec.openapis.org/oas/latest.html> |
@@ -37,6 +37,67 @@ Official issues filed by the iFlow team against each upstream project, used to c
 | Hermes Agent (`NousResearch/hermes-agent`) | [#29250](https://github.com/NousResearch/hermes-agent/issues/29250) — *Docs request: iFlow Search MCP server configuration for Hermes Agent* | Docs request (MCP server config) | Open, triaged by upstream — labels: `type/docs`, `tool/mcp`, `P3` |
 
 None of these issues block this repo's roadmap — `@iflow-ai/search-langchain`, the LangGraph example, and `@iflow-ai/search-mcp` already work against unmodified upstream versions. They exist so upstream maintainers can decide whether to surface iFlow in their own integration docs.
+
+## Next integration priorities
+
+Six concrete workstreams sit between the current `next` releases and stable `0.1.0` / Phase 4 reach. Listed in execution order. Of these, **only #1 gates stable `0.1.0`** — the remaining items improve ecosystem reach but do not block the move from dist-tag `next` to `latest`.
+
+### 1. Claude Code MCP smoke
+
+- **Path:** reuse `@iflow-ai/search-mcp@next` over stdio — the same package already verified against Hermes Agent. Configuration goes in Claude Code's `mcpServers` block (`.mcp.json` project-scoped or `claude mcp add` user-scoped); see [`mcp-design.md`](./mcp-design.md) §8 for the shape.
+- **No new package.**
+- **Why first:** [`mcp-design.md`](./mcp-design.md) §9 requires at least two real MCP clients smoked end-to-end before any version moves to dist-tag `latest`. Hermes is the first. Claude Code is the missing second — and therefore the only item on this list that gates stable `0.1.0`.
+
+### 2. OpenAPI schema
+
+- **Path:** add an in-repo OpenAPI 3.x spec describing the three iFlow Search primitives. Default location: `docs/openapi.yaml` — final location decided as part of this workstream (resolves [`mcp-design.md`](./mcp-design.md) §11 Q3).
+- **Source of truth:** `@iflow-ai/search-core`'s exported types. v1 may be hand-authored; generator-driven only if maintenance burden grows.
+- **Why second:** unlocks Open WebUI (#4) and Coze (#5) in one stroke. Higher leverage than internal-only iFlow CLI work, so it goes ahead of #3.
+- Must specify `Authorization: Bearer …`, expected response shapes, and the iFlow business-error mapping (`AUTH_FAILED`, `RATE_LIMITED`, `UPSTREAM_ERROR`, `NETWORK_ERROR`) so third-party consumers know what to expect.
+
+### 3. iFlow CLI
+
+- **Path:** thin Node bin over `@iflow-ai/search-core`. Default `"private": true` workspace package — internal-only unless a separate decision says otherwise. If shipped externally, follows the same `next`-then-`latest` cadence as the other packages.
+- **Hard rule:** must reuse `search-core` for all HTTP / `Authorization` / attribution-header / response-parsing / error-mapping logic. No `fetch` in the CLI source.
+- **Does not gate stable `0.1.0`.** Parallelizable with #2.
+
+### 4. Open WebUI recipe
+
+- **Path:** depends on #2. Add `examples/openwebui-iflow/` with a README walking through the Open WebUI tool-config flow against the OpenAPI artifact from #2.
+- **MCP is the fallback, not the primary path.** Open WebUI's first-class extension surface is OpenAPI tools — use it.
+- **Does not gate stable `0.1.0`.**
+
+### 5. Coze recipe
+
+- **Path:** depends on #2. Add `examples/coze-iflow/` with the OpenAPI plugin import flow.
+- If Coze requires fields the canonical OpenAPI spec doesn't carry (icon, locale, category, …), those go in a **Coze-specific overlay** inside the example — not in the canonical `docs/openapi.yaml`.
+- **Does not gate stable `0.1.0`.**
+
+### 6. CrewAI MCP recipe
+
+- **Path:** reuse `@iflow-ai/search-mcp@next`. Add `examples/crewai-iflow/` with a Python script using CrewAI's MCP client adapter pointed at `npx -y @iflow-ai/search-mcp@next`.
+- **No new package — npm or PyPI.** `@iflow-ai/search-crewai` and an equivalent PyPI package are both explicitly rejected per [`package-strategy.md`](./package-strategy.md). Reachable via existing MCP server with zero new release work.
+- **Does not gate stable `0.1.0`.** Lowest priority of the six.
+
+### Stable `0.1.0` gating
+
+The promotion from dist-tag `next` to dist-tag `latest` requires only:
+
+1. The MCP cross-client smoke gate ([`mcp-design.md`](./mcp-design.md) §9) — Hermes ✅ done, Claude Code outstanding (#1 above).
+2. The pre-publish checklist in [`release-policy.md`](./release-policy.md).
+
+None of #2–#6 block stable `0.1.0`. They are Phase 4 reach work, not Phase 3 release gates.
+
+### Hard constraints (reiterated)
+
+These come from [`package-strategy.md`](./package-strategy.md) and remain non-negotiable while this priority list executes:
+
+- **No client-specific packages.** Not `@iflow-ai/search-claude-code`, not `@iflow-ai/search-hermes`, not `@iflow-ai/search-openwebui`, not `@iflow-ai/search-coze`, not `@iflow-ai/search-crewai`, not `@iflow-ai/search-langgraph`, not `@iflow-ai/search-openclaw`. The single MCP package + OpenAPI artifact + examples are sufficient.
+- **Claude Code, Hermes Agent, and Claude Desktop all share `@iflow-ai/search-mcp`.** No fan-out.
+- **Open WebUI and Coze go through OpenAPI first.** MCP is fallback only.
+- **CrewAI goes through MCP.** No Python package — npm or PyPI — unless MCP proves insufficient.
+- **iFlow CLI is a thin wrapper over `@iflow-ai/search-core`.** No re-implemented request logic.
+- **All HTTP / `Authorization` / attribution headers / response parsing / error mapping live in `@iflow-ai/search-core` only.** Adapters translate; they do not duplicate.
 
 ## Execution phases
 
@@ -77,6 +138,18 @@ The phases below are the order we intend to ship work in. They are not deadlines
 - Validate against at least two MCP clients before publishing.
 
 **Exit criteria:** MCP server published to `next`, working stdio transport, validated against ≥ 2 clients (recommended pair: Claude Code + Claude Desktop), unit + protocol smoke + real-API smoke all green.
+
+**Verification record (partial — Hermes only; Claude Code outstanding per [Next integration priorities §1](#1-claude-code-mcp-smoke)):**
+
+- ✅ `@iflow-ai/search-mcp@0.1.0-pre.0` published on dist-tag `next` (note: first publish of a new `@iflow-ai/*` package also auto-assigned `latest` — to be corrected when a stable `0.1.0` ships; see [`release-policy.md`](./release-policy.md)).
+- ✅ Local `dist/bin.js` smoke green — Hermes spawned the server directly from the built artifact under `packages/search-mcp/dist/bin.js`, initialize + `tools/list` returned the three expected tools.
+- ✅ Published-tarball smoke green — Hermes spawned the server via `npx -y @iflow-ai/search-mcp@next` (clean external resolution from npm, not from the workspace), initialize + `tools/list` returned the same three tools.
+- ✅ Three real iFlow API calls executed through Hermes against the published package, each via the corresponding MCP tool:
+  - `iflow_web_search` — query "latest LLM benchmarks 2026", `count: 3` — three results returned, titles and URLs populated.
+  - `iflow_image_search` — query "great wall of china", `count: 3` — three images returned with `imageUrl` populated.
+  - `iflow_web_fetch` — URL `https://example.com` — fetched and returned readable content.
+- ✅ Hygiene checks passed for both transports (local bin and `npx`-launched npm package): no JSON-RPC parse errors on the client side, no stdout pollution from the server (all diagnostics on stderr), no mid-call server disconnects, no failed `initialize` handshakes.
+- ⏳ Claude Code MCP client smoke outstanding — see Next integration priorities §1. Required as the second MCP client before promoting any version to dist-tag `latest`.
 
 ### Phase 4 — Open WebUI / Coze / CrewAI
 
