@@ -1,0 +1,63 @@
+{
+  "name": "@iflow-ai/search-mcp",
+  "version": "0.1.0-pre.0",
+  "description": "MCP (Model Context Protocol) server for the iFlow Search API. Exposes web search, image search, and web fetch to any MCP client (Claude Code, Claude Desktop, Hermes Agent, …). Built on @iflow-ai/search-core.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zhengyanglsun/iflow-search-js.git",
+    "directory": "packages/search-mcp"
+  },
+  "bugs": {
+    "url": "https://github.com/zhengyanglsun/iflow-search-js/issues"
+  },
+  "homepage": "https://github.com/zhengyanglsun/iflow-search-js/tree/main/packages/search-mcp#readme",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "iflow-search-mcp": "./dist/bin.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "iflow",
+    "iflow-search",
+    "mcp",
+    "model-context-protocol",
+    "claude-code",
+    "claude-desktop",
+    "hermes",
+    "web-search",
+    "image-search",
+    "web-fetch"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepack": "pnpm run build"
+  },
+  "dependencies": {
+    "@iflow-ai/search-core": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.29.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
+  }
+}
