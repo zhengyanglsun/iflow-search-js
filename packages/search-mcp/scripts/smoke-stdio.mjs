@@ -121,6 +121,9 @@ console.log(`[smoke] fake iFlow listening on ${baseUrl}`);
 
 // ── 2. Drive the real MCP binary over stdio ──────────────────────────────────
 
+const SMOKE_MCP_CLIENT = "smoke-host";
+const SMOKE_MCP_CLIENT_VERSION = "9.9.9-smoke";
+
 const transport = new StdioClientTransport({
   command: process.execPath,
   args: [BIN_PATH],
@@ -128,6 +131,8 @@ const transport = new StdioClientTransport({
     PATH: process.env.PATH ?? "",
     IFLOW_API_KEY: FAKE_KEY,
     IFLOW_BASE_URL: baseUrl,
+    IFLOW_MCP_CLIENT: SMOKE_MCP_CLIENT,
+    IFLOW_MCP_CLIENT_VERSION: SMOKE_MCP_CLIENT_VERSION,
   },
   stderr: "inherit",
 });
@@ -183,6 +188,14 @@ try {
   assert(
     last.headers["authorization"] === `Bearer ${FAKE_KEY}`,
     "Authorization header carries the env IFLOW_API_KEY",
+  );
+  assert(
+    last.headers["iflow-mcp-client"] === SMOKE_MCP_CLIENT,
+    `IFlow-MCP-Client header = "${SMOKE_MCP_CLIENT}" (got ${JSON.stringify(last.headers["iflow-mcp-client"])})`,
+  );
+  assert(
+    last.headers["iflow-mcp-client-version"] === SMOKE_MCP_CLIENT_VERSION,
+    `IFlow-MCP-Client-Version header = "${SMOKE_MCP_CLIENT_VERSION}" (got ${JSON.stringify(last.headers["iflow-mcp-client-version"])})`,
   );
 } catch (err) {
   console.error("[smoke] unexpected error:", err);

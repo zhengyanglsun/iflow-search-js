@@ -56,6 +56,43 @@ describe("attribution headers", () => {
       expect(headers["Authorization"]).toBe(`Bearer ${FAKE_KEY}`);
     }
   });
+
+  it("does NOT include IFlow-MCP-Client headers when clientName is absent", async () => {
+    const captured: RequestInit[] = [];
+    const fetchMock = vi.fn(async (_url: string | URL | Request, init: RequestInit = {}) => {
+      captured.push(init);
+      return jsonResponse({ success: true, data: { organic: [] } });
+    });
+    const client = buildClient(fetchMock as unknown as typeof fetch);
+    await webSearchTool.handle({ query: "x" }, client);
+    const headers = captured[0].headers as Record<string, string>;
+    expect(headers).not.toHaveProperty("IFlow-MCP-Client");
+    expect(headers).not.toHaveProperty("IFlow-MCP-Client-Version");
+  });
+
+  it("includes IFlow-MCP-Client when clientName is set on the client", async () => {
+    const captured: RequestInit[] = [];
+    const fetchMock = vi.fn(async (_url: string | URL | Request, init: RequestInit = {}) => {
+      captured.push(init);
+      return jsonResponse({ success: true, data: { organic: [] } });
+    });
+    const client = createIFlowSearchClient({
+      apiKey: FAKE_KEY,
+      fetch: fetchMock as unknown as typeof fetch,
+      source: "mcp",
+      integrationName: "@iflow-ai/search-mcp",
+      integrationVersion: "0.1.0-test",
+      clientName: "hermes",
+      clientVersion: "0.6.2",
+    });
+    await webSearchTool.handle({ query: "x" }, client);
+    const headers = captured[0].headers as Record<string, string>;
+    expect(headers["IFlow-MCP-Client"]).toBe("hermes");
+    expect(headers["IFlow-MCP-Client-Version"]).toBe("0.6.2");
+    // Existing four headers must remain unchanged.
+    expect(headers["IFlow-Source"]).toBe("mcp");
+    expect(headers["IFlow-Integration"]).toBe("@iflow-ai/search-mcp");
+  });
 });
 
 // ── endpoint dispatch ────────────────────────────────────────────────────────

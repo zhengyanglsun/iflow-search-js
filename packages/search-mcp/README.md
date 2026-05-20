@@ -39,12 +39,27 @@ Add an entry to your client's `mcpServers` configuration:
       "command": "npx",
       "args": ["-y", "@iflow-ai/search-mcp"],
       "env": {
-        "IFLOW_API_KEY": "YOUR_IFLOW_API_KEY"
+        "IFLOW_API_KEY": "YOUR_IFLOW_API_KEY",
+        "IFLOW_MCP_CLIENT": "claude-code"
       }
     }
   }
 }
 ```
+
+For Claude Desktop, the wiring is identical but set `IFLOW_MCP_CLIENT` to
+`claude-desktop` so backend analytics can tell the two apart:
+
+```json
+"env": {
+  "IFLOW_API_KEY": "YOUR_IFLOW_API_KEY",
+  "IFLOW_MCP_CLIENT": "claude-desktop"
+}
+```
+
+`IFLOW_MCP_CLIENT` is optional — see the [Configuration](#configuration)
+table for the allowed value set. If absent, no `IFlow-MCP-Client` header
+is sent (the request is still attributed to `IFlow-Source: mcp`).
 
 > **Do not commit a real key.** Put `YOUR_IFLOW_API_KEY` in version control
 > and inject the real value at runtime (your client's secret store, a local
@@ -65,6 +80,7 @@ mcp_servers:
       - "@iflow-ai/search-mcp@next"
     env:
       IFLOW_API_KEY: YOUR_IFLOW_API_KEY
+      IFLOW_MCP_CLIENT: hermes
 ```
 
 Verify Hermes can spawn the server and list its three tools:
@@ -80,6 +96,10 @@ Notes:
   subprocesses (`PATH`, `HOME`, `USER`, …); anything else, including your
   iFlow key, has to be declared here. Keep `YOUR_IFLOW_API_KEY` as a
   placeholder in anything you share — never commit the real key.
+- `IFLOW_MCP_CLIENT: hermes` tags every outbound request with the
+  `IFlow-MCP-Client: hermes` header so backend analytics can distinguish
+  Hermes traffic from Claude Code / Claude Desktop. The field is optional
+  but recommended.
 - Prefer `@next` (as above) or a pinned version like
   `@iflow-ai/search-mcp@0.1.0-pre.0`. Avoid the bare `@iflow-ai/search-mcp`
   in shared configs so upgrades stay intentional.
@@ -104,6 +124,8 @@ block of the MCP client config above.
 | `IFLOW_API_KEY` | yes | — | Bearer token sent to iFlow as `Authorization: Bearer ...`. |
 | `IFLOW_BASE_URL` | no | `https://platform.iflow.cn` | Override for testing / private deployments. |
 | `IFLOW_TIMEOUT_MS` | no | `30000` | Per-request timeout. Must be a positive integer if set. |
+| `IFLOW_MCP_CLIENT` | no | — | Declared MCP host name (e.g. `hermes`, `claude-code`, `claude-desktop`). When set, emitted as the `IFlow-MCP-Client` header so backend analytics can distinguish hosts. Allowed: `[a-z0-9._-]{1,64}`. Absent = no header sent (we never send a placeholder like `unknown`). |
+| `IFLOW_MCP_CLIENT_VERSION` | no | — | Optional version for the above host. When both are set, emitted as `IFlow-MCP-Client-Version`. Allowed: `[A-Za-z0-9._+-]{1,64}`. Ignored unless `IFLOW_MCP_CLIENT` is set. |
 
 A missing or invalid configuration is a fatal init error: the process
 writes a one-line diagnostic to **stderr** (never stdout, so the JSON-RPC
@@ -150,8 +172,21 @@ IFlow-Integration-Version: <pkg version>
 User-Agent: @iflow-ai/search-mcp/<pkg version>
 ```
 
+When the MCP client config sets `IFLOW_MCP_CLIENT` (and optionally
+`IFLOW_MCP_CLIENT_VERSION`), the following are additionally sent:
+
+```
+IFlow-MCP-Client: hermes | claude-code | claude-desktop | ...
+IFlow-MCP-Client-Version: <only if IFLOW_MCP_CLIENT_VERSION is set>
+```
+
 This lets iFlow account for traffic generated through the MCP server
-separately from direct, LangChain, or other adapters.
+separately from direct, LangChain, or other adapters, AND distinguish
+which MCP host (Hermes / Claude Code / Claude Desktop / custom) generated
+each request. The `IFlow-MCP-Client` value is operator-declared — it is
+not auto-detected from the MCP `clientInfo` handshake, so backend
+dashboards see a stable, allowlist-style set of host slugs rather than
+free-form, self-reported strings.
 
 ## License
 

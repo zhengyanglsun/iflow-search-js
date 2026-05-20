@@ -85,6 +85,8 @@ function resolveOptions(opts: IFlowSearchClientOptions): ResolvedClientConfig {
       source: opts.source,
       integrationName: opts.integrationName,
       integrationVersion: opts.integrationVersion,
+      clientName: opts.clientName,
+      clientVersion: opts.clientVersion,
     }),
   };
 }

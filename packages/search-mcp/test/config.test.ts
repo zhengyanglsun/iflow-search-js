@@ -78,4 +78,100 @@ describe("loadConfig", () => {
       ).toThrow(ConfigError);
     }
   });
+
+  // ── IFLOW_MCP_CLIENT / IFLOW_MCP_CLIENT_VERSION ────────────────────────────
+
+  it("leaves clientName / clientVersion undefined when not set", () => {
+    const cfg = loadConfig({ IFLOW_API_KEY: SECRET });
+    expect(cfg.clientName).toBeUndefined();
+    expect(cfg.clientVersion).toBeUndefined();
+  });
+
+  it("accepts known MCP host slugs (lowercase, dash, dot, underscore)", () => {
+    for (const value of ["hermes", "claude-code", "claude-desktop", "cline", "host_2.0", "x"]) {
+      const cfg = loadConfig({
+        IFLOW_API_KEY: SECRET,
+        IFLOW_MCP_CLIENT: value,
+      });
+      expect(cfg.clientName).toBe(value);
+    }
+  });
+
+  it("trims whitespace around IFLOW_MCP_CLIENT", () => {
+    const cfg = loadConfig({
+      IFLOW_API_KEY: SECRET,
+      IFLOW_MCP_CLIENT: "  hermes  ",
+    });
+    expect(cfg.clientName).toBe("hermes");
+  });
+
+  it("treats empty/whitespace IFLOW_MCP_CLIENT as unset", () => {
+    const cfg = loadConfig({
+      IFLOW_API_KEY: SECRET,
+      IFLOW_MCP_CLIENT: "   ",
+    });
+    expect(cfg.clientName).toBeUndefined();
+  });
+
+  it("rejects uppercase letters and spaces in IFLOW_MCP_CLIENT", () => {
+    for (const bad of ["Hermes", "Claude Code", "Claude/Code", "x+y", "hi!", "a b"]) {
+      expect(() =>
+        loadConfig({ IFLOW_API_KEY: SECRET, IFLOW_MCP_CLIENT: bad }),
+      ).toThrow(ConfigError);
+    }
+  });
+
+  it("rejects IFLOW_MCP_CLIENT longer than 64 chars", () => {
+    expect(() =>
+      loadConfig({
+        IFLOW_API_KEY: SECRET,
+        IFLOW_MCP_CLIENT: "a".repeat(65),
+      }),
+    ).toThrow(ConfigError);
+  });
+
+  it("accepts a sane semver-ish IFLOW_MCP_CLIENT_VERSION when paired with client name", () => {
+    const cfg = loadConfig({
+      IFLOW_API_KEY: SECRET,
+      IFLOW_MCP_CLIENT: "claude-code",
+      IFLOW_MCP_CLIENT_VERSION: "1.2.3-beta.4+build.5",
+    });
+    expect(cfg.clientName).toBe("claude-code");
+    expect(cfg.clientVersion).toBe("1.2.3-beta.4+build.5");
+  });
+
+  it("rejects IFLOW_MCP_CLIENT_VERSION with disallowed characters", () => {
+    for (const bad of ["1.0 beta", "1.0/2", "1.0!", "v 1"]) {
+      expect(() =>
+        loadConfig({
+          IFLOW_API_KEY: SECRET,
+          IFLOW_MCP_CLIENT: "hermes",
+          IFLOW_MCP_CLIENT_VERSION: bad,
+        }),
+      ).toThrow(ConfigError);
+    }
+  });
+
+  it("rejects IFLOW_MCP_CLIENT_VERSION when IFLOW_MCP_CLIENT is missing", () => {
+    expect(() =>
+      loadConfig({
+        IFLOW_API_KEY: SECRET,
+        IFLOW_MCP_CLIENT_VERSION: "1.2.3",
+      }),
+    ).toThrow(ConfigError);
+  });
+
+  it("config errors never echo the API key", () => {
+    let captured: Error | undefined;
+    try {
+      loadConfig({
+        IFLOW_API_KEY: SECRET,
+        IFLOW_MCP_CLIENT: "Bad Value",
+      });
+    } catch (err) {
+      captured = err as Error;
+    }
+    expect(captured).toBeInstanceOf(ConfigError);
+    expect(captured?.message).not.toContain(SECRET);
+  });
 });

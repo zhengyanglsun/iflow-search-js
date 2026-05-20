@@ -40,6 +40,8 @@ async function main(): Promise<void> {
     source: SOURCE,
     integrationName: INTEGRATION_NAME,
     integrationVersion: VERSION,
+    clientName: config.clientName,
+    clientVersion: config.clientVersion,
   });
 
   const server = buildServer({ client, integrationVersion: VERSION });

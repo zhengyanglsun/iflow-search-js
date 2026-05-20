@@ -86,4 +86,16 @@ export interface IFlowSearchClientOptions {
   integrationName: string;
   /** e.g. "1.2.3". Required. */
   integrationVersion: string;
+  /**
+   * MCP host calling this integration. Optional. Only meaningful when
+   * source === "mcp" — e.g. "hermes", "claude-code", "claude-desktop".
+   * When set, emitted as the IFlow-MCP-Client header. Absence ≠ "unknown":
+   * we simply do not emit the header.
+   */
+  clientName?: string;
+  /**
+   * Version of the MCP host. Optional, ignored unless clientName is set.
+   * When set, emitted as the IFlow-MCP-Client-Version header.
+   */
+  clientVersion?: string;
 }
