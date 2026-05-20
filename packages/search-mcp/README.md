@@ -51,6 +51,41 @@ Add an entry to your client's `mcpServers` configuration:
 > override file ignored by git, a `direnv` block, etc.). `@iflow-ai/search-mcp`
 > never reads from disk and will not pick up a `.env` automatically.
 
+### Hermes Agent
+
+Add the server to `~/.hermes/config.yaml`:
+
+```yaml
+# ~/.hermes/config.yaml
+mcp_servers:
+  iflow-search:
+    command: npx
+    args:
+      - -y
+      - "@iflow-ai/search-mcp@next"
+    env:
+      IFLOW_API_KEY: YOUR_IFLOW_API_KEY
+```
+
+Verify Hermes can spawn the server and list its three tools:
+
+```bash
+hermes mcp test iflow-search
+```
+
+Notes:
+
+- `IFLOW_API_KEY` **must** be set inside the server's `env:` block. Hermes
+  only forwards a small allowlist of parent-shell variables to MCP
+  subprocesses (`PATH`, `HOME`, `USER`, …); anything else, including your
+  iFlow key, has to be declared here. Keep `YOUR_IFLOW_API_KEY` as a
+  placeholder in anything you share — never commit the real key.
+- Prefer `@next` (as above) or a pinned version like
+  `@iflow-ai/search-mcp@0.1.0-pre.0`. Avoid the bare `@iflow-ai/search-mcp`
+  in shared configs so upgrades stay intentional.
+- stdio only: Hermes runs the binary as a child process and speaks
+  JSON-RPC over stdin/stdout. No `url` / `headers` fields are needed.
+
 After your client restarts, the three tools appear automatically:
 
 | Tool | What it does |
