@@ -15,25 +15,56 @@ What this server is **not**:
 - It is not an HTTP API. It is not a hosted service. It is not a proxy that survives across requests. Each MCP client invocation spawns a fresh stdio process and tears it down.
 - It does not add features to iFlow Search. If `search-core` can't do it, this server can't either.
 
-## 2. Package decision
+## 2. MVP decisions (locked)
 
-| Field | Value |
+Everything in the table below is **locked** for the MVP. Detailed rationale lives in the referenced sections; this table is the at-a-glance summary so future readers don't have to scan the whole document. If a decision here ever needs to change, update this table first and the downstream sections second.
+
+| Topic | Decision |
 |---|---|
 | Package name | `@iflow-ai/search-mcp` |
-| Location | `packages/search-mcp/` (this monorepo) |
-| Runtime deps | `@iflow-ai/search-core`, an MCP server SDK (likely `@modelcontextprotocol/sdk`), and nothing else |
+| Package location | `packages/search-mcp/` in this monorepo |
 | License | MIT |
-| Bin | `iflow-search-mcp` (see CLI entry) |
-| Initial version | `0.1.0-pre.0`, dist-tag `next` |
+| Binary name | `iflow-search-mcp` — see §7 |
+| MCP SDK | `@modelcontextprotocol/sdk` (the official TypeScript reference SDK) |
+| Transport scope (MVP) | **stdio only** — see §3 |
+| Config source | Process environment variables only — no file config, no CLI flags for secrets — see §5 |
+| Required env | `IFLOW_API_KEY` |
+| Optional env | `IFLOW_BASE_URL`, `IFLOW_TIMEOUT_MS` |
+| Attribution `IFlow-Source` | `mcp` — see §6 |
+| Attribution `IFlow-Integration` | `@iflow-ai/search-mcp` |
+| Tool names | `iflow_web_search`, `iflow_image_search`, `iflow_web_fetch` — see §4 |
+| Initial publish target | `0.1.0-pre.0` on dist-tag `next` — see §10 |
 
-Packages we explicitly do **not** create as part of MCP coverage, with reasons:
+### Runtime dependencies
 
-- **`@iflow-ai/search-claude-code`** — Claude Code already consumes MCP servers. A Claude-Code-specific package would be a re-export bound to one client's release cycle.
-- **`@iflow-ai/search-hermes`** — Hermes Agent is an MCP client. Same reasoning.
-- **`@iflow-ai/search-openwebui`** — Open WebUI's first-class extension surfaces are OpenAPI and MCP. We will ship via MCP (this server) or an OpenAPI spec, not a UI-specific npm package.
-- **`@iflow-ai/search-coze`** — Coze ingests OpenAPI plugins. Solved by OpenAPI in a later phase, not a Coze-specific package.
+| Dep | Why |
+|---|---|
+| `@iflow-ai/search-core` | All iFlow API request logic. The MCP server constructs its client through `createIFlowSearchClient(...)` and does not call `fetch` directly. |
+| `@modelcontextprotocol/sdk` | MCP server framing, stdio transport, tool registration, error mapping. |
 
-`@iflow-ai/search-mcp` is the single MCP integration point. Every MCP-speaking client gets reach via this package.
+No other runtime deps. If `zod` is needed for tool input schemas it follows whatever version the MCP SDK already pins as a transitive — never a separately-pinned major.
+
+### Architecture constraint — reuse `@iflow-ai/search-core`, do not reimplement
+
+The MCP server is a **thin transport wrapper**. It must:
+
+- Construct its iFlow client through `createIFlowSearchClient(...)` from `@iflow-ai/search-core`.
+- Inherit retries, timeouts, response normalization, attribution headers, error shape, and base-URL handling from `search-core` unchanged.
+- **Not** re-implement iFlow API request logic, response parsing, header construction, or error shaping. If `search-core` cannot do something the MCP server needs, the capability is added to `search-core` first and consumed here — never duplicated inside `search-mcp`.
+
+This is the same rule that already governs `@iflow-ai/search-langchain`, which is why that package has zero `fetch` code of its own and why its attribution headers were verified end-to-end against the real iFlow API without `search-langchain` touching the network path.
+
+### Non-goals for the MVP
+
+Listed here so reviewers don't have to chase "why isn't this in the spec?":
+
+- **Streamable HTTP / SSE transports.** The MVP does **not** implement them. Adding HTTP transports forces decisions about bind host, auth (token? mTLS?), Origin allow-list, CORS, and rate limiting that have no universally correct default. They are revisited only if a concrete remote-deployment use case lands (e.g., a hosted Hermes instance). See §3 for the abstraction we keep open and Open Question 4 for the trigger.
+- **WebSocket transport.** Not on the MCP spec track we target.
+- **Client-specific npm packages.** No `@iflow-ai/search-claude-code`, `@iflow-ai/search-hermes`, `@iflow-ai/search-openwebui`, `@iflow-ai/search-coze`, `@iflow-ai/search-crewai`. Every MCP-speaking client reaches iFlow via this single package. See [`package-strategy.md`](./package-strategy.md) for the full rubric.
+- **File-backed config.** No `~/.iflow-search-mcp.json`, no `.env` discovery, no keychain integration. The MCP client's `env` block is the only configuration source — keeping the key off the filesystem is the security model.
+- **CLI flags for the API key.** Env only. Env vars don't appear in `ps -ef` the way command-line arguments do on most platforms.
+- **Multiple API keys per process.** One server instance = one iFlow account. Spawn a second `mcpServers` entry if a second key is needed.
+- **Hosting / proxying.** The MCP server is a local stdio process spawned and torn down by the client. It is not a daemon, not a network service, and not a key broker.
 
 ## 3. Transport scope
 
@@ -229,13 +260,9 @@ Aligns with the existing [`release-policy.md`](./release-policy.md). MCP-specifi
 
 ## 11. Open questions
 
-These need to be resolved before — or early during — implementation. None of them block writing this design.
+Only the items below remain genuinely undecided. Everything that used to live here about package name, MCP SDK choice, Open WebUI / Coze coverage, tool description sourcing, and structured-vs-text output rendering is now resolved in §2 above.
 
-1. **Streamable HTTP timeline.** Do we anticipate any remote-deployed MCP consumer in the next two releases? If yes, factor the transport boundary now even though MVP ships stdio only. If no, defer the abstraction.
-2. **Hermes Agent config format.** Confirm the exact `mcpServers` schema Hermes consumes — the example in Section 8 is Anthropic-shaped and may need a per-client variant in the README.
-3. **`.mcp.json` example shipping form.** Should `examples/mcp-claude-code/.mcp.json` exist as a copy-paste-ready file? If yes, it must contain only `YOUR_IFLOW_API_KEY` placeholders, and the example directory needs a README warning against committing real keys.
-4. **Open WebUI / Coze path.** Section 2 declares OpenAPI as the integration path for these clients. Open question: do we author the OpenAPI spec inside this repo (e.g., `docs/openapi.yaml` generated from `search-core` types), or in a separate documentation repo?
-5. **Separate OpenAPI schema.** Related: should `search-core` expose its request/response shapes as a publishable OpenAPI document, or is this only relevant when Phase 4 (Open WebUI / Coze) starts?
-6. **MCP SDK choice.** Confirm `@modelcontextprotocol/sdk` is the right runtime dep — check current spec compliance, license, and bundle size. If it's heavy, consider implementing the MCP framing inline against the spec.
-7. **Tool description text.** The agent-facing descriptions live in `@iflow-ai/search-langchain` today. Extract them into `@iflow-ai/search-core` (or a small shared util) so MCP and LangChain stay in sync, or accept some duplication?
-8. **Structured tool output gating.** Some MCP clients still ignore structured `content` and only show text. Decide whether the text summary should be a faithful render of the structured payload or a shorter human-friendly variant. (Recommendation: faithful render. Hidden text-only divergence is hard to diagnose later.)
+1. **Hermes Agent `mcpServers` config format.** The Anthropic-shaped JSON block in §8 may need a per-client variant — Hermes' exact `mcpServers` config schema needs confirmation before we ship a Hermes-side recipe. Decision unblocked once we have access to a Hermes test client.
+2. **`examples/mcp-claude-code/` shipping form.** Do we ship a copy-paste-ready `.mcp.json` example directory in this monorepo? If yes, it must contain only `YOUR_IFLOW_API_KEY` placeholders and the example dir needs a README warning against committing real keys. If no, the README config snippet in §8 is the only artifact users get.
+3. **OpenAPI schema location and ownership.** When Phase 4 of the integration roadmap starts (Open WebUI / Coze), do we author the OpenAPI spec inside this repo (e.g. `docs/openapi.yaml` generated from `search-core` types), in a separate documentation repo, or document the HTTP surface in prose only? Triggered by Phase 4, not by MCP — but worth resolving early so `search-core` type exports can be designed with schema generation in mind.
+4. **Streamable HTTP — future need.** Is there a remote-deployed MCP consumer (e.g. hosted Hermes, multi-tenant Claude Desktop replacement) expected in the next two releases? If yes, factor the transport boundary now so adding Streamable HTTP later does not require touching tool handlers. If no, defer the abstraction entirely. Decision deadline: before promoting `@iflow-ai/search-mcp` to `latest`. The MVP ships stdio-only regardless.

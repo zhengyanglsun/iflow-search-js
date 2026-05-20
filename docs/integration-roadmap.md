@@ -20,13 +20,24 @@ How each integration target gets to iFlow Search, and which lever (npm package v
 
 The phases below are the order we intend to ship work in. They are not deadlines — each phase only starts after the previous phase's exit criteria are met.
 
-### Phase 1 — harden what is already published
+### Phase 1 — harden what is already published ✅ **complete**
 
 - Verify external `npm install @iflow-ai/search-core@next` and `npm install @iflow-ai/search-langchain@next` from a clean directory outside this workspace.
 - Run real-iFlow smoke tests against `@iflow-ai/search-langchain` and the LangGraph example.
 - Tighten READMEs, examples, and error messages based on real-install feedback.
 
 **Exit criteria:** clean external install, real smoke green, no open issues against the published tarballs.
+
+**Verification record:**
+
+- ✅ `@iflow-ai/search-core@next` external cold install passed from `/tmp/iflow-core-install-check` — resolves to `0.1.0-pre.0`, no nested deps (confirms zero runtime dependencies), all 15 named exports present (`IFlowSearchClient`, `createIFlowSearchClient`, `buildAttributionHeaders`, `redactApiKey`, `isIFlowError`, normalizers and constants).
+- ✅ `@iflow-ai/search-langchain@next` external install passed from `/tmp/iflow-npm-real-smoke` — resolves to `0.1.0-pre.0`, nested `@iflow-ai/search-core@0.1.0-pre.0` (confirms the `workspace:*` → concrete-version rewrite landed correctly on the published tarball).
+- ✅ Real iFlow API smoke green for all three tools through `@iflow-ai/search-langchain`:
+  - `iflow_web_search` — 3 results, content present, first result `心流AI助手 → https://iflow.cn/`.
+  - `iflow_image_search` — 3 images, image URLs present.
+  - `iflow_web_fetch` — title / url / content all present for `https://platform.iflow.cn/docs/`.
+- ✅ Attribution headers verified on every real request: `IFlow-Source: langchain`, `IFlow-Integration: @iflow-ai/search-langchain`, `IFlow-Integration-Version` present, `User-Agent: @iflow-ai/search-langchain/0.1.0-pre.0`, `Authorization` present (value never logged).
+- ✅ `@iflow-ai/search-core@next` direct real-API smoke green (not via LangChain): clean external install of `@iflow-ai/search-core@0.1.0-pre.0` in a temp dir, then `createIFlowSearchClient(...)` invoked directly. All three primitives returned real iFlow data — `webSearch` (3 results, first `快速开始 - 心流开放平台 → https://platform.iflow.cn/docs`), `imageSearch` (3 images), `webFetch` (`https://platform.iflow.cn/docs`, 1009-char content). Attribution headers identical across all three calls: `IFlow-Source: core`, `IFlow-Integration: iflow-core-direct-smoke`, `IFlow-Integration-Version: 0.0.0`, `User-Agent: iflow-core-direct-smoke/0.0.0`, `Authorization` present (value redacted via `redactApiKey()`, never logged). Verdict block: `{ allEndpointsOk: true, attributionSourceAlwaysCore: true, attributionIntegrationCorrect: true }`. This was the previously-open follow-up — now closed; `IFlow-Source: core` is first-party measured, not implied.
 
 ### Phase 2 — internal reuse for OpenClaw plugin
 
@@ -37,10 +48,10 @@ The phases below are the order we intend to ship work in. They are not deadlines
 
 ### Phase 3 — `@iflow-ai/search-mcp`
 
-- **Design document** lives at [`mcp-design.md`](./mcp-design.md) — package name, transport scope, tool schema, attribution headers, CLI entry, MCP client config example, and test strategy are all pinned there. Read that before implementation begins.
+- **Design document** lives at [`mcp-design.md`](./mcp-design.md). MVP decisions are **locked** — see `mcp-design.md` §2 — including single package `@iflow-ai/search-mcp`, **stdio-only transport**, `@modelcontextprotocol/sdk` as the MCP runtime, env-only configuration (`IFLOW_API_KEY` / `IFLOW_BASE_URL` / `IFLOW_TIMEOUT_MS`), and the architecture constraint that the server must reuse `@iflow-ai/search-core` rather than re-implementing iFlow request logic.
 - Implement the MCP server in this monorepo under `packages/search-mcp`.
 - Cover Hermes Agent, Claude Code, Claude Desktop, and any other MCP client in a single package.
-- **MVP transport is stdio only.** Streamable HTTP is deferred until a concrete remote-deployment use case lands (see `mcp-design.md` §3).
+- **MVP transport is stdio only.** Streamable HTTP / SSE are deferred and only revisited if a concrete remote-deployment use case lands (see `mcp-design.md` §3 and Open Question 4).
 - Validate against at least two MCP clients before publishing.
 
 **Exit criteria:** MCP server published to `next`, working stdio transport, validated against ≥ 2 clients (recommended pair: Claude Code + Claude Desktop), unit + protocol smoke + real-API smoke all green.
