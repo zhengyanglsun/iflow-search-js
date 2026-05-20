@@ -2,6 +2,16 @@
 
 How each integration target gets to iFlow Search, and which lever (npm package vs. MCP vs. OpenAPI vs. example) we use for each. Read together with [`package-strategy.md`](./package-strategy.md) — the strategy doc explains *why* the table looks the way it does.
 
+### Project identity
+
+- **Product:** iFlow Search
+- **Website:** <https://platform.iflow.cn>
+- **npm scope:** `@iflow-ai`
+- **Repo:** <https://github.com/zhengyanglsun/iflow-search-js>
+- **Maintainer:** maintained by the iFlow team, associated with Hangzhou Xingchen Qianxun Technology Co., Ltd. (杭州星辰千寻科技有限公司)
+
+All upstream integration / docs requests filed by this project are filed by the iFlow team under the identity above.
+
 ## Integration matrix
 
 | Integration target | Recommended path | npm package? | Current status | Notes | Reference links |
@@ -15,6 +25,18 @@ How each integration target gets to iFlow Search, and which lever (npm package v
 | **Open WebUI** | OpenAPI tool spec, or the planned MCP server | No | Not started | Open WebUI's first-class extension surfaces are OpenAPI tools and MCP. We ship a spec / server, not a UI-specific npm package. | <https://docs.openwebui.com/> · <https://spec.openapis.org/oas/latest.html> |
 | **Coze** | OpenAPI plugin or HTTP tool config | No | Not started | Coze ingests OpenAPI plugins directly. Same lever as Open WebUI. | <https://www.coze.com/docs/> · <https://spec.openapis.org/oas/latest.html> |
 | **CrewAI** | Planned `@iflow-ai/search-mcp` server (MCP-over-stdio); future Python package if MCP is insufficient | No npm package — CrewAI is Python | Not started | If a Python adapter is ever needed, it ships on PyPI, not npm. | <https://docs.crewai.com/> · <https://modelcontextprotocol.io/> |
+
+## Upstream tracking issues
+
+Official issues filed by the iFlow team against each upstream project, used to coordinate integration / docs work. These are tracking links only — implementation lives in this repo and the published npm packages.
+
+| Upstream | Issue | Kind | Status |
+|---|---|---|---|
+| LangChain JS (`langchain-ai/langchainjs`) | [#10931](https://github.com/langchain-ai/langchainjs/issues/10931) — *Integration request: iFlow Search tools for LangChain JS* | Integration / docs request | Open, awaiting upstream triage |
+| LangGraph JS (`langchain-ai/langgraphjs`) | [#2419](https://github.com/langchain-ai/langgraphjs/issues/2419) — *Example request: LangGraph JS agent using iFlow Search LangChain tools* | Docs / example request | Open, awaiting upstream triage |
+| Hermes Agent (`NousResearch/hermes-agent`) | [#29250](https://github.com/NousResearch/hermes-agent/issues/29250) — *Docs request: iFlow Search MCP server configuration for Hermes Agent* | Docs request (MCP server config) | Open, triaged by upstream — labels: `type/docs`, `tool/mcp`, `P3` |
+
+None of these issues block this repo's roadmap — `@iflow-ai/search-langchain`, the LangGraph example, and `@iflow-ai/search-mcp` already work against unmodified upstream versions. They exist so upstream maintainers can decide whether to surface iFlow in their own integration docs.
 
 ## Execution phases
 
