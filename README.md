@@ -11,7 +11,7 @@ This monorepo contains:
 - A framework-agnostic core SDK
 - A LangChain JS tool adapter (also usable from LangGraph)
 - A LangGraph agent example
-- A planned MCP server for Hermes / MCP clients
+- An MCP stdio server for Hermes / Claude Code / Claude Desktop / other MCP clients
 
 ## Package / usage matrix
 
@@ -20,7 +20,7 @@ This monorepo contains:
 | `packages/search-core` | `@iflow-ai/search-core` | implemented | npm | — (zero runtime deps) | You are building a framework adapter, calling iFlow directly from a backend, or you don't use LangChain. |
 | `packages/search-langchain` | `@iflow-ai/search-langchain` | implemented | npm | `@iflow-ai/search-core`, `@langchain/core`, `zod` | You are building a LangChain JS agent **or** a LangGraph agent — both reuse the same tool factories. |
 | `examples/langgraph-agent` | `@iflow-examples/langgraph-agent` | implemented | **not published** (workspace example) | `@iflow-ai/search-langchain`, `@langchain/langgraph` | Reference for wiring `createReactAgent` with iFlow Search tools. Copy the pattern, don't depend on it. |
-| `packages/search-mcp` | `@iflow-ai/search-mcp` | planned | npm | `@iflow-ai/search-core`, MCP SDK | You want to expose iFlow Search to MCP clients (Hermes Agent, Claude Desktop, etc.). Not implemented yet. |
+| `packages/search-mcp` | `@iflow-ai/search-mcp` | implemented | npm | `@iflow-ai/search-core`, MCP SDK | You want to expose iFlow Search to MCP clients (Hermes Agent, Claude Code, Claude Desktop, etc.). Stdio transport. |
 
 ### Why there is no `@iflow-ai/search-langgraph`
 
@@ -32,7 +32,7 @@ LangGraph consumes LangChain tools directly. A separate `search-langgraph` packa
 - ✅ `@iflow-ai/search-langchain` — implemented, three tools (`iflow_web_search`, `iflow_image_search`, `iflow_web_fetch`)
 - ✅ `examples/langgraph-agent` — implemented, ReAct agent end-to-end smoke validated against real iFlow API
 - ❌ no separate `@iflow-ai/search-langgraph` package (intentional — see above)
-- 🟡 `@iflow-ai/search-mcp` — planned, not implemented yet
+- ✅ `@iflow-ai/search-mcp` — implemented, stdio MCP server with three tools mirroring the LangChain adapter; optional MCP-host attribution via `IFLOW_MCP_CLIENT` / `IFLOW_MCP_CLIENT_VERSION`
 
 ## Workspace development
 
@@ -111,7 +111,9 @@ Currently emitted values:
 | Integration | `IFlow-Source` | `IFlow-Integration` |
 |---|---|---|
 | `@iflow-ai/search-langchain` (also from LangGraph) | `langchain` | `@iflow-ai/search-langchain` |
-| `@iflow-ai/search-mcp` *(planned)* | `mcp` | `@iflow-ai/search-mcp` |
+| `@iflow-ai/search-mcp` | `mcp` | `@iflow-ai/search-mcp` |
+
+`@iflow-ai/search-mcp` additionally emits `IFlow-MCP-Client` and `IFlow-MCP-Client-Version` when the MCP host declares itself via `IFLOW_MCP_CLIENT` / `IFLOW_MCP_CLIENT_VERSION` environment variables (e.g. `hermes`, `claude-code`, `claude-desktop`). Absence of these headers is meaningful — there is no `unknown` placeholder, so hosts that opt out remain indistinguishable from hosts that have not adopted the convention.
 
 LangGraph traffic shows up as `IFlow-Source: langchain` because it consumes the same LangChain adapter — there is no separate `langgraph` source ID for this reason.
 
@@ -127,7 +129,7 @@ LangGraph traffic shows up as `IFlow-Source: langchain` because it consumes the 
 - **P0** ✅ `@iflow-ai/search-core` — framework-agnostic SDK
 - **P1** ✅ `@iflow-ai/search-langchain` — LangChain JS tool adapter
 - **P2** ✅ `examples/langgraph-agent` — LangGraph ReAct agent example
-- **P3** 🟡 `@iflow-ai/search-mcp` — MCP server for Hermes / Claude Desktop / other MCP clients
+- **P3** ✅ `@iflow-ai/search-mcp` — MCP server for Hermes / Claude Desktop / other MCP clients
 - **P4** 🟡 docs and examples polish — broader recipes, additional LLM providers
 - **P5** optional — refactor the OpenClaw community iFlow plugin to reuse `@iflow-ai/search-core`
 
