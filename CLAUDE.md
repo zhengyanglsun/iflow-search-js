@@ -1,6 +1,8 @@
-# iflow-search-js — Claude project notes
+# CLAUDE.md
 
-pnpm workspace monorepo for the **iFlow Search SDK** and framework adapters.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+This repo is **iflow-search-js** — a pnpm workspace monorepo for the **iFlow Search SDK** and framework adapters.
 
 - npm scope: `@iflow-ai/*`
 - GitHub: `github.com/zhengyanglsun/iflow-search-js` (owner ≠ npm scope)
@@ -17,6 +19,10 @@ examples/
   langgraph-agent/    end-to-end LangGraph demo (not published)
 ```
 
+## Workspace pinnings — landmines
+
+`pnpm-workspace.yaml` pins `@langchain/core` via `overrides:` to `^1.1.44`. **Do not remove or relax this override.** Removing it re-introduces `ToolMessage` cross-version serialization bugs in LangGraph agent loops. If you must touch it, rerun `pnpm --filter @iflow-examples/langgraph-agent test` and the langgraph-agent smoke before merging.
+
 ## Architecture invariant — DO NOT VIOLATE
 
 All HTTP, Authorization, attribution headers, and error mapping live **only** in `@iflow-ai/search-core`. Adapters (`search-langchain`, `search-mcp`) must never call `fetch` directly, never construct headers, and never parse iFlow error shapes. They only:
@@ -26,6 +32,24 @@ All HTTP, Authorization, attribution headers, and error mapping live **only** in
 3. Map the normalized result into the framework's expected shape.
 
 If you find yourself building HTTP headers inside an adapter, stop and extend `search-core/src/headers.ts` instead.
+
+## Code landmarks
+
+The architecture invariant maps to these files. Start here before grepping:
+
+```
+packages/search-core/src/client.ts        fetch + retry + auth (the ONLY place that calls fetch)
+packages/search-core/src/headers.ts       attribution headers builder — extend this, not adapters
+packages/search-core/src/errors.ts        iFlow error shape → normalized error
+packages/search-core/src/normalize.ts     response shaping into ToolResult<T>
+packages/search-core/src/config.ts        client construction defaults
+packages/search-mcp/src/server.ts         MCP tool registration
+packages/search-mcp/src/bin.ts            stdio entrypoint + startup banner (must go to stderr)
+packages/search-mcp/src/config.ts         env var parsing + IFLOW_MCP_CLIENT validation
+packages/search-mcp/scripts/smoke-stdio.mjs  end-to-end stdio smoke with a fake iFlow server
+packages/search-langchain/src/tools.ts    three LangChain tool factories
+examples/langgraph-agent/src/agent.ts     reference createReactAgent wiring
+```
 
 ## Attribution headers
 
@@ -50,11 +74,16 @@ Validation patterns (`packages/search-mcp/src/config.ts`):
 - `IFLOW_MCP_CLIENT`         → `/^[a-z0-9._-]{1,64}$/u`
 - `IFLOW_MCP_CLIENT_VERSION` → `/^[A-Za-z0-9._+-]{1,64}$/u` (rejected unless `IFLOW_MCP_CLIENT` is also set)
 
-## Versions (as of last release activity)
+## How to check current package versions
 
-- `@iflow-ai/search-core@0.1.0-pre.1` — published, `next` tag
-- `@iflow-ai/search-mcp@0.1.0-pre.1` — published, `next` tag
-- `@iflow-ai/search-langchain@0.1.0-pre.0` — published, `next` tag
+Versions change between sessions — never trust a hard-coded list in this file. Always look up live state:
+
+```bash
+npm view @iflow-ai/search-core dist-tags --json
+npm view @iflow-ai/search-mcp dist-tags --json
+npm view @iflow-ai/search-langchain dist-tags --json
+git log --oneline -5                            # see recent release commits
+```
 
 `latest` dist-tag intentionally still points at `0.1.0-pre.0` on each package. **Do not move `latest` and do not run `npm dist-tag rm latest`** — npm returns `E400` for scoped packages with only pre-release versions. Always recommend `@next` installs.
 
@@ -66,6 +95,9 @@ pnpm -r run build                                           # all packages
 pnpm -r run test                                            # all packages (vitest)
 node packages/search-mcp/scripts/smoke-stdio.mjs            # stdio MCP smoke (uses local fake iFlow)
 pnpm --filter @iflow-ai/search-core build                   # one package
+pnpm --filter @iflow-ai/search-core test                    # one package's vitest
+pnpm --filter @iflow-ai/search-core test -- test/headers.test.ts   # one test file
+pnpm --filter @iflow-ai/search-core test:watch              # interactive watch mode
 pnpm --filter @iflow-ai/search-mcp pack --dry-run           # inspect tarball contents
 ```
 
@@ -108,3 +140,14 @@ If you need to verify outbound headers (e.g. `IFlow-MCP-Client: hermes`) against
 - Don't `git push`, `npm publish`, or modify dist-tags unless the user explicitly asks for that turn.
 - Don't bump versions opportunistically — version bumps are their own commit (`chore(release): ...`).
 - When in doubt about a destructive or shared-state action, confirm before running.
+
+## Long-form docs
+
+For questions whose answer is "why" rather than "how to", go to `docs/` before grepping or guessing:
+
+```
+docs/package-strategy.md     which @iflow-ai/* packages exist, which we will not publish, decision rubric
+docs/integration-roadmap.md  framework adapter priorities (LangChain, MCP, OpenClaw, etc.) and ordering
+docs/release-policy.md       versioning, next vs latest, per-release checklist, manual publish commands
+docs/mcp-design.md           MCP server design rationale: transport, tool schema, attribution headers
+```
