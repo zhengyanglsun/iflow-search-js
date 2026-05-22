@@ -15,9 +15,12 @@ packages/
   search-core/        @iflow-ai/search-core         framework-agnostic SDK (zero runtime deps)
   search-langchain/   @iflow-ai/search-langchain    LangChain adapter
   search-mcp/         @iflow-ai/search-mcp          MCP stdio server (Claude Code / Claude Desktop / Hermes)
+  search-openapi/     @iflow-ai/search-openapi      HTTP/OpenAPI 3.1 tool server (Open WebUI / Coze / generic OpenAPI hosts)
 examples/
   langgraph-agent/    end-to-end LangGraph demo (not published)
 ```
+
+Adapter packages (`search-langchain`, `search-mcp`, `search-openapi`) all depend on `search-core` via `workspace:*` and expose the same three tools — `iflow_web_search`, `iflow_image_search`, `iflow_web_fetch` — with identical input/output shapes so prompts written against one runtime keep working under another.
 
 ## Workspace pinnings — landmines
 
@@ -48,6 +51,12 @@ packages/search-mcp/src/bin.ts            stdio entrypoint + startup banner (mus
 packages/search-mcp/src/config.ts         env var parsing + IFLOW_MCP_CLIENT validation
 packages/search-mcp/scripts/smoke-stdio.mjs  end-to-end stdio smoke with a fake iFlow server
 packages/search-langchain/src/tools.ts    three LangChain tool factories
+packages/search-openapi/src/server.ts     HTTP request listener; single source of truth for routes
+packages/search-openapi/src/bin.ts        process entrypoint (init-time config errors → stderr, exit 1)
+packages/search-openapi/src/config.ts     env var parsing + IFLOW_OPENAPI_AUTH_TOKEN / IFLOW_OPENAPI_CLIENT validation
+packages/search-openapi/src/auth.ts       bearer-token gate (timing-safe compare)
+packages/search-openapi/src/openapi.ts    OpenAPI 3.1 document builder (driven by handlers list)
+packages/search-openapi/src/handlers/index.ts  ordered tool handlers — also fixes /openapi.json order
 examples/langgraph-agent/src/agent.ts     reference createReactAgent wiring
 ```
 
@@ -56,8 +65,8 @@ examples/langgraph-agent/src/agent.ts     reference createReactAgent wiring
 Every outbound request to iFlow carries (built by `search-core/src/headers.ts`):
 
 ```
-IFlow-Source:              langchain | mcp | ...    (caller-supplied)
-IFlow-Integration:         @iflow-ai/search-mcp     (npm package making the call)
+IFlow-Source:              langchain | mcp | openapi | ...   (caller-supplied)
+IFlow-Integration:         @iflow-ai/search-mcp              (npm package making the call)
 IFlow-Integration-Version: <package version>
 User-Agent:                @iflow-ai/search-mcp/<version>
 Authorization:             Bearer <user-supplied IFLOW_API_KEY>
@@ -70,9 +79,13 @@ IFlow-MCP-Client:          hermes | claude-code | claude-desktop | <slug>
 IFlow-MCP-Client-Version:  <version>     (only if both name and version are set)
 ```
 
-Validation patterns (`packages/search-mcp/src/config.ts`):
-- `IFLOW_MCP_CLIENT`         → `/^[a-z0-9._-]{1,64}$/u`
-- `IFLOW_MCP_CLIENT_VERSION` → `/^[A-Za-z0-9._+-]{1,64}$/u` (rejected unless `IFLOW_MCP_CLIENT` is also set)
+Validation patterns:
+- `IFLOW_MCP_CLIENT`         → `/^[a-z0-9._-]{1,64}$/u`           (`packages/search-mcp/src/config.ts`)
+- `IFLOW_MCP_CLIENT_VERSION` → `/^[A-Za-z0-9._+-]{1,64}$/u`        (rejected unless `IFLOW_MCP_CLIENT` is also set)
+- `IFLOW_OPENAPI_CLIENT`     → `/^[a-z0-9._-]{1,64}$/u`           (`packages/search-openapi/src/config.ts`) — stored on `ResolvedConfig.clientName`, surfaced in the startup banner, **not** forwarded as `IFlow-MCP-Client` (that header is MCP-only)
+
+OpenAPI-only server-side gate (independent of the iFlow `Authorization` header above):
+- `IFLOW_OPENAPI_AUTH_TOKEN` — when set, every route except `GET /health` requires `Authorization: Bearer <token>` from the caller; compared with `timingSafeEqual` in `packages/search-openapi/src/auth.ts`. Absent ⇒ open mode.
 
 ## How to check current package versions
 
@@ -82,6 +95,7 @@ Versions change between sessions — never trust a hard-coded list in this file.
 npm view @iflow-ai/search-core dist-tags --json
 npm view @iflow-ai/search-mcp dist-tags --json
 npm view @iflow-ai/search-langchain dist-tags --json
+npm view @iflow-ai/search-openapi dist-tags --json
 git log --oneline -5                            # see recent release commits
 ```
 
@@ -105,18 +119,21 @@ pnpm --filter @iflow-ai/search-mcp pack --dry-run           # inspect tarball co
 
 **Never publish without running the full pre-publish gate** (typecheck + build + test + smoke-stdio + pack dry-run + publish dry-run + secret scan).
 
-Order matters because `search-mcp` depends on `search-core`:
+Order matters because the adapter packages (`search-mcp`, `search-langchain`, `search-openapi`) all depend on `search-core` via `workspace:*`:
 
 1. `git push origin main`
 2. `pnpm --filter @iflow-ai/search-core publish --access public --tag next`
 3. `npm view @iflow-ai/search-core@next version`  → confirm new version
-4. `pnpm --filter @iflow-ai/search-mcp publish --access public --tag next`
-5. `npm view @iflow-ai/search-mcp@next version`   → confirm new version
+4. Then publish each adapter being released (skip any package with no changes):
+   - `pnpm --filter @iflow-ai/search-mcp publish --access public --tag next`
+   - `pnpm --filter @iflow-ai/search-langchain publish --access public --tag next`
+   - `pnpm --filter @iflow-ai/search-openapi publish --access public --tag next`
+5. `npm view @iflow-ai/<pkg>@next version` for each → confirm new version
 6. Cold-install smoke from `/tmp` against the freshly-published tarballs.
 
 Rules:
 - **Always** `--tag next`. Never `latest`. Never `npm dist-tag rm latest`.
-- `workspace:*` in `search-mcp/package.json` gets rewritten to the concrete version by pnpm at publish time — verify by extracting the packed tarball and inspecting its `package.json`.
+- `workspace:*` in adapter `package.json` files gets rewritten to the concrete version by pnpm at publish time — verify by extracting the packed tarball and inspecting its `package.json`.
 - Never write a real `IFLOW_API_KEY` to any tracked file. README examples use `YOUR_IFLOW_API_KEY` as a placeholder.
 
 ## Local testing with a real iFlow key
