@@ -32,7 +32,7 @@ export function checkBearer(
       status: 401,
       code: "unauthorized",
       message:
-        "Missing Authorization header. Send `Authorization: Bearer <token>`.",
+        'Missing Authorization header. Send "Authorization: Bearer <token>".',
     };
   }
 
