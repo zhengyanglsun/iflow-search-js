@@ -96,6 +96,22 @@ importers:
         specifier: ^1.6.0
         version: 1.6.1(@types/node@20.19.41)
 
+  packages/search-openapi:
+    dependencies:
+      '@iflow-ai/search-core':
+        specifier: workspace:*
+        version: link:../search-core
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.41
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+      vitest:
+        specifier: ^1.6.0
+        version: 1.6.1(@types/node@20.19.41)
+
 packages:
 
   '@cfworker/json-schema@4.1.1':

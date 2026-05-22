@@ -1,0 +1,62 @@
+{
+  "name": "@iflow-ai/search-openapi",
+  "version": "0.1.0-pre.0",
+  "description": "HTTP / OpenAPI tool server for the iFlow Search API. Exposes web search, image search, and web fetch over JSON-over-HTTP for Open WebUI, Coze, and other OpenAPI 3.x tool hosts. Built on @iflow-ai/search-core.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zhengyanglsun/iflow-search-js.git",
+    "directory": "packages/search-openapi"
+  },
+  "bugs": {
+    "url": "https://github.com/zhengyanglsun/iflow-search-js/issues"
+  },
+  "homepage": "https://github.com/zhengyanglsun/iflow-search-js/tree/main/packages/search-openapi#readme",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "iflow-search-openapi": "./dist/bin.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "iflow",
+    "iflow-search",
+    "openapi",
+    "http",
+    "tool-server",
+    "open-webui",
+    "coze",
+    "web-search",
+    "image-search",
+    "web-fetch"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepack": "pnpm run build"
+  },
+  "dependencies": {
+    "@iflow-ai/search-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
+  }
+}
