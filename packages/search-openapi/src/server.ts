@@ -44,7 +44,7 @@ export interface AppOptions {
   corsOrigin?: string | undefined;
 }
 
-const CORS_ALLOWED_HEADERS = "Content-Type, Authorization";
+const CORS_ALLOWED_HEADERS = "Content-Type, Authorization, X-Session-Id";
 const CORS_ALLOWED_METHODS = "GET, POST, OPTIONS";
 
 export function createApp(options: AppOptions): RequestListener {

@@ -425,7 +425,7 @@ describe("HTTP server", () => {
       "http://localhost:3000",
     );
     expect(res.headers.get("access-control-allow-headers")).toBe(
-      "Content-Type, Authorization",
+      "Content-Type, Authorization, X-Session-Id",
     );
     expect(res.headers.get("access-control-allow-methods")).toBe(
       "GET, POST, OPTIONS",
@@ -491,8 +491,29 @@ describe("HTTP server", () => {
       "http://localhost:3000",
     );
     expect(res.headers.get("access-control-allow-headers")).toBe(
-      "Content-Type, Authorization",
+      "Content-Type, Authorization, X-Session-Id",
     );
+  });
+
+  it("OPTIONS with X-Session-Id in Access-Control-Request-Headers is allowed (Open WebUI)", async () => {
+    harness = await startServer({
+      fetchImpl: vi.fn(async () =>
+        jsonResponse({ success: true, data: { organic: [] } }),
+      ),
+      corsOrigin: "http://localhost:3000",
+    });
+    const res = await fetch(`${harness.url}/tools/iflow_web_search`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: "http://localhost:3000",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "content-type,x-session-id",
+      },
+    });
+    expect(res.status).toBe(204);
+    const acah = res.headers.get("access-control-allow-headers") ?? "";
+    expect(acah.toLowerCase()).toContain("x-session-id");
+    expect(acah.toLowerCase()).toContain("content-type");
   });
 
   it("OPTIONS preflight bypasses the bearer gate but POST still requires the token", async () => {
