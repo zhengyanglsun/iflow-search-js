@@ -35,10 +35,20 @@ export interface AppOptions {
   client: IFlowSearchClient;
   /** When set, every route except /health requires `Authorization: Bearer <token>`. */
   authToken: string | undefined;
+  /**
+   * When set, every response carries `Access-Control-Allow-Origin: <value>` plus
+   * the companion CORS headers, and `OPTIONS` short-circuits to 204 without the
+   * bearer gate. Absent ⇒ no CORS headers (current behavior). Config validates
+   * the value so it is safe to copy verbatim into a response header.
+   */
+  corsOrigin?: string | undefined;
 }
 
+const CORS_ALLOWED_HEADERS = "Content-Type, Authorization";
+const CORS_ALLOWED_METHODS = "GET, POST, OPTIONS";
+
 export function createApp(options: AppOptions): RequestListener {
-  const { client, authToken } = options;
+  const { client, authToken, corsOrigin } = options;
   const openApiDocument = buildOpenApiDocument({
     bearerAuth: authToken !== undefined,
   });
@@ -54,6 +64,22 @@ export function createApp(options: AppOptions): RequestListener {
       const method = req.method ?? "GET";
       const url = new URL(req.url ?? "/", "http://localhost");
       const pathname = url.pathname;
+
+      // CORS gate runs before /health and before the bearer check so that
+      // browser preflights from Open WebUI / Coze succeed without a token.
+      // When corsOrigin is unset the block is a complete no-op and the
+      // server behaves exactly as before.
+      if (corsOrigin !== undefined) {
+        res.setHeader("Access-Control-Allow-Origin", corsOrigin);
+        res.setHeader("Access-Control-Allow-Headers", CORS_ALLOWED_HEADERS);
+        res.setHeader("Access-Control-Allow-Methods", CORS_ALLOWED_METHODS);
+        res.setHeader("Vary", "Origin");
+        if (method === "OPTIONS") {
+          res.statusCode = 204;
+          res.end();
+          return;
+        }
+      }
 
       // /health is intentionally outside the auth gate.
       if (method === "GET" && pathname === "/health") {

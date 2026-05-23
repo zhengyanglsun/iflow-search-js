@@ -32,9 +32,14 @@ interface Harness {
 async function startServer(options: {
   fetchImpl: typeof fetch;
   authToken?: string;
+  corsOrigin?: string;
 }): Promise<Harness> {
   const client = buildClient(options.fetchImpl);
-  const app = createApp({ client, authToken: options.authToken });
+  const app = createApp({
+    client,
+    authToken: options.authToken,
+    corsOrigin: options.corsOrigin,
+  });
   const server: Server = createServer(app);
   await new Promise<void>((resolve) => {
     server.listen(0, "127.0.0.1", () => resolve());
@@ -368,5 +373,182 @@ describe("HTTP server", () => {
       body: JSON.stringify({ query: "x" }),
     });
     expect(res.status).toBe(200);
+  });
+
+  // ── CORS gate ─────────────────────────────────────────────────────────────
+
+  it("emits no CORS headers when corsOrigin is unset (open mode)", async () => {
+    harness = await startServer({
+      fetchImpl: vi.fn(async () =>
+        jsonResponse({ success: true, data: { organic: [] } }),
+      ),
+    });
+    const res = await fetch(`${harness.url}/openapi.json`, {
+      headers: { Origin: "http://localhost:3000" },
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("access-control-allow-origin")).toBeNull();
+    expect(res.headers.get("access-control-allow-headers")).toBeNull();
+    expect(res.headers.get("access-control-allow-methods")).toBeNull();
+    expect(res.headers.get("vary")).toBeNull();
+  });
+
+  it("emits no CORS headers when corsOrigin is unset (bearer mode)", async () => {
+    harness = await startServer({
+      fetchImpl: vi.fn(async () =>
+        jsonResponse({ success: true, data: { organic: [] } }),
+      ),
+      authToken: "secret-token",
+    });
+    const res = await fetch(`${harness.url}/openapi.json`, {
+      headers: {
+        Origin: "http://localhost:3000",
+        Authorization: "Bearer secret-token",
+      },
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("access-control-allow-origin")).toBeNull();
+  });
+
+  it("adds CORS headers on GET /openapi.json when corsOrigin is set", async () => {
+    harness = await startServer({
+      fetchImpl: vi.fn(async () =>
+        jsonResponse({ success: true, data: { organic: [] } }),
+      ),
+      corsOrigin: "http://localhost:3000",
+    });
+    const res = await fetch(`${harness.url}/openapi.json`, {
+      headers: { Origin: "http://localhost:3000" },
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("access-control-allow-origin")).toBe(
+      "http://localhost:3000",
+    );
+    expect(res.headers.get("access-control-allow-headers")).toBe(
+      "Content-Type, Authorization",
+    );
+    expect(res.headers.get("access-control-allow-methods")).toBe(
+      "GET, POST, OPTIONS",
+    );
+    expect(res.headers.get("vary")).toBe("Origin");
+  });
+
+  it("adds CORS headers on GET /health when corsOrigin is set", async () => {
+    harness = await startServer({
+      fetchImpl: vi.fn(async () =>
+        jsonResponse({ success: true, data: { organic: [] } }),
+      ),
+      corsOrigin: "*",
+    });
+    const res = await fetch(`${harness.url}/health`, {
+      headers: { Origin: "https://example.openwebui.local" },
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("access-control-allow-origin")).toBe("*");
+  });
+
+  it("OPTIONS /openapi.json returns 204 with CORS headers and empty body", async () => {
+    harness = await startServer({
+      fetchImpl: vi.fn(async () =>
+        jsonResponse({ success: true, data: { organic: [] } }),
+      ),
+      corsOrigin: "http://localhost:3000",
+    });
+    const res = await fetch(`${harness.url}/openapi.json`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: "http://localhost:3000",
+        "Access-Control-Request-Method": "GET",
+      },
+    });
+    expect(res.status).toBe(204);
+    expect(res.headers.get("access-control-allow-origin")).toBe(
+      "http://localhost:3000",
+    );
+    expect(res.headers.get("access-control-allow-methods")).toBe(
+      "GET, POST, OPTIONS",
+    );
+    expect(await res.text()).toBe("");
+  });
+
+  it("OPTIONS /tools/iflow_web_search returns 204 with CORS headers", async () => {
+    harness = await startServer({
+      fetchImpl: vi.fn(async () =>
+        jsonResponse({ success: true, data: { organic: [] } }),
+      ),
+      corsOrigin: "http://localhost:3000",
+    });
+    const res = await fetch(`${harness.url}/tools/iflow_web_search`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: "http://localhost:3000",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "content-type",
+      },
+    });
+    expect(res.status).toBe(204);
+    expect(res.headers.get("access-control-allow-origin")).toBe(
+      "http://localhost:3000",
+    );
+    expect(res.headers.get("access-control-allow-headers")).toBe(
+      "Content-Type, Authorization",
+    );
+  });
+
+  it("OPTIONS preflight bypasses the bearer gate but POST still requires the token", async () => {
+    const upstream = vi.fn(async () =>
+      jsonResponse({ success: true, data: { organic: [] } }),
+    );
+    harness = await startServer({
+      fetchImpl: upstream,
+      authToken: "right-token",
+      corsOrigin: "http://localhost:3000",
+    });
+
+    // Preflight without Authorization succeeds.
+    const pre = await fetch(`${harness.url}/tools/iflow_web_search`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: "http://localhost:3000",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "content-type, authorization",
+      },
+    });
+    expect(pre.status).toBe(204);
+    expect(pre.headers.get("access-control-allow-origin")).toBe(
+      "http://localhost:3000",
+    );
+    expect(upstream).not.toHaveBeenCalled();
+
+    // POST without bearer is still 401 (and still carries CORS headers so the
+    // browser surfaces the real 401 instead of a CORS error).
+    const denied = await fetch(`${harness.url}/tools/iflow_web_search`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "http://localhost:3000",
+      },
+      body: JSON.stringify({ query: "x" }),
+    });
+    expect(denied.status).toBe(401);
+    expect(denied.headers.get("access-control-allow-origin")).toBe(
+      "http://localhost:3000",
+    );
+    expect(upstream).not.toHaveBeenCalled();
+
+    // POST with the right bearer succeeds and also carries CORS headers.
+    const ok = await fetch(`${harness.url}/tools/iflow_web_search`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer right-token",
+        Origin: "http://localhost:3000",
+      },
+      body: JSON.stringify({ query: "x" }),
+    });
+    expect(ok.status).toBe(200);
+    expect(ok.headers.get("access-control-allow-origin")).toBe(
+      "http://localhost:3000",
+    );
   });
 });

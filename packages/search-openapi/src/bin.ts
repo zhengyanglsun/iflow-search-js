@@ -51,6 +51,7 @@ async function main(): Promise<void> {
   const app = createApp({
     client,
     authToken: config.authToken,
+    corsOrigin: config.corsOrigin,
   });
   const httpServer = createServer(app);
 
@@ -84,8 +85,9 @@ async function main(): Promise<void> {
       ? "bearer auth ENABLED"
       : "bearer auth DISABLED (open mode)";
     const clientNote = config.clientName ? ` client=${config.clientName}` : "";
+    const corsNote = config.corsOrigin ? ` cors=${config.corsOrigin}` : "";
     process.stderr.write(
-      `[${INTEGRATION_NAME}] v${VERSION} listening on http://0.0.0.0:${boundPort} — ${authNote}${clientNote}\n`,
+      `[${INTEGRATION_NAME}] v${VERSION} listening on http://0.0.0.0:${boundPort} — ${authNote}${clientNote}${corsNote}\n`,
     );
   });
 }

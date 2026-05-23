@@ -61,6 +61,7 @@ All configuration is read from `process.env`.
 | `PORT` | no | `8787` | TCP port to listen on. Must be an integer in `[0, 65535]`. |
 | `IFLOW_OPENAPI_AUTH_TOKEN` | no | — | When set, every endpoint **except** `/health` requires `Authorization: Bearer <token>`. Constant-time compared. Absent = open mode (no auth gate). |
 | `IFLOW_OPENAPI_CLIENT` | no | — | Identifies the host platform (`open-webui`, `coze`, …). Allowed: `[a-z0-9._-]{1,64}`. Captured into the startup banner; not forwarded to iFlow today. |
+| `IFLOW_OPENAPI_CORS_ORIGIN` | no | — | When set, every response carries `Access-Control-Allow-Origin: <value>` plus the matching `Access-Control-Allow-Headers / Methods` and `Vary: Origin`, and `OPTIONS` preflights short-circuit to `204` (no bearer required). Required for **browser-side** tool imports (Open WebUI's user/global tool servers, Coze's plugin importer). Accepts `*` or `http(s)://host[:port]` — any path, query, fragment, or non-printable character is rejected at startup. |
 
 A missing or invalid configuration is a fatal init error: the process
 writes a one-line diagnostic to **stderr** and exits with code `1`.

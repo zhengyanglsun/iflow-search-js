@@ -14,6 +14,15 @@
  *                                            for future platform attribution. Stored on
  *                                            ResolvedConfig.clientName so server.ts and
  *                                            tests can observe it.
+ *   IFLOW_OPENAPI_CORS_ORIGIN  (optional) — when set, every response carries
+ *                                            `Access-Control-Allow-Origin: <value>` plus the
+ *                                            companion CORS headers, and `OPTIONS` requests
+ *                                            short-circuit to 204 without the bearer gate.
+ *                                            Absent ⇒ no CORS headers (current behavior).
+ *                                            Accepts `*` or `http(s)://host[:port]`; anything
+ *                                            with a path, query, fragment, or non-printable
+ *                                            char is rejected at init time to keep header
+ *                                            injection out of responses.
  *
  * Errors thrown here are init-time fatal: bin.ts prints them to stderr
  * and exits non-zero BEFORE the HTTP listener is wired up.
@@ -28,6 +37,7 @@ export interface ResolvedConfig {
   port: number;
   authToken: string | undefined;
   clientName: string | undefined;
+  corsOrigin: string | undefined;
 }
 
 export interface EnvLike {
@@ -37,6 +47,7 @@ export interface EnvLike {
   PORT?: string | undefined;
   IFLOW_OPENAPI_AUTH_TOKEN?: string | undefined;
   IFLOW_OPENAPI_CLIENT?: string | undefined;
+  IFLOW_OPENAPI_CORS_ORIGIN?: string | undefined;
 }
 
 export class ConfigError extends Error {
@@ -47,6 +58,11 @@ export class ConfigError extends Error {
 }
 
 const CLIENT_NAME_PATTERN = /^[a-z0-9._-]{1,64}$/u;
+// Accepts `*` or scheme://host[:port] with no path/query/fragment and no
+// non-printable bytes. Capping at 253-char hostnames + scheme + port keeps
+// the whole thing comfortably under 256; the pattern itself enforces shape.
+const CORS_ORIGIN_PATTERN =
+  /^(\*|https?:\/\/[A-Za-z0-9.-]{1,253}(?::[0-9]{1,5})?)$/u;
 
 export function loadConfig(env: EnvLike = process.env): ResolvedConfig {
   const apiKey = (env.IFLOW_API_KEY ?? "").trim();
@@ -103,5 +119,24 @@ export function loadConfig(env: EnvLike = process.env): ResolvedConfig {
     clientName = rawClient;
   }
 
-  return { apiKey, baseUrl, timeoutMs, port, authToken, clientName };
+  const rawCors = env.IFLOW_OPENAPI_CORS_ORIGIN?.trim();
+  let corsOrigin: string | undefined;
+  if (rawCors && rawCors.length > 0) {
+    if (!CORS_ORIGIN_PATTERN.test(rawCors)) {
+      throw new ConfigError(
+        `IFLOW_OPENAPI_CORS_ORIGIN must be "*" or "http(s)://host[:port]" with no path, query, fragment, or non-printable characters. Got: ${JSON.stringify(rawCors)}.`,
+      );
+    }
+    corsOrigin = rawCors;
+  }
+
+  return {
+    apiKey,
+    baseUrl,
+    timeoutMs,
+    port,
+    authToken,
+    clientName,
+    corsOrigin,
+  };
 }
