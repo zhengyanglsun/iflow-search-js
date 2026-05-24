@@ -167,4 +167,5 @@ docs/package-strategy.md     which @iflow-ai/* packages exist, which we will not
 docs/integration-roadmap.md  framework adapter priorities (LangChain, MCP, OpenClaw, etc.) and ordering
 docs/release-policy.md       versioning, next vs latest, per-release checklist, manual publish commands
 docs/mcp-design.md           MCP server design rationale: transport, tool schema, attribution headers
+docs/platform-smokes.md      Open WebUI / Coze real-platform smoke results, host-specific overlays, follow-up work
 ```
