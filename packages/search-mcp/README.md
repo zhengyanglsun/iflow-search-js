@@ -106,6 +106,80 @@ Notes:
 - stdio only: Hermes runs the binary as a child process and speaks
   JSON-RPC over stdin/stdout. No `url` / `headers` fields are needed.
 
+### OpenCode
+
+[OpenCode](https://opencode.ai/) is a terminal coding agent with
+first-class stdio MCP support. Configuration goes in `opencode.json`
+(project-scoped) or `~/.config/opencode/opencode.json` (user-scoped).
+
+Two things make OpenCode's wiring different from the Claude / Hermes
+blocks above:
+
+1. **The top-level block is `mcp`, not `mcpServers`**, and the per-server
+   env block is `environment`, not `env`. `command` and `args` are
+   folded into a single `command: [...]` array.
+2. **Do NOT put `IFLOW_API_KEY` in the `environment` block.** OpenCode
+   inherits the parent process's full env into every stdio MCP child
+   (see `packages/opencode/src/mcp/index.ts` in
+   [`anomalyco/opencode`](https://github.com/anomalyco/opencode):
+   `env: { ...process.env, ...mcp.environment }`). Exporting
+   `IFLOW_API_KEY` in the shell that launches OpenCode is sufficient —
+   the key never appears in any committed file. The `environment` map
+   does **not** expand `${VAR}` shell syntax (Effect schema
+   `Record<string, string>`, taken verbatim), so writing
+   `"${IFLOW_API_KEY}"` as a value would send the literal string to
+   the MCP child and break iFlow auth.
+
+Export the key once in your shell:
+
+```bash
+export IFLOW_API_KEY="YOUR_IFLOW_API_KEY"
+```
+
+Then put **only non-secret** values in `opencode.json`:
+
+```json
+{
+  "mcp": {
+    "iflow-search": {
+      "type": "local",
+      "command": ["npx", "-y", "@iflow-ai/search-mcp@next"],
+      "environment": {
+        "IFLOW_MCP_CLIENT": "opencode"
+      },
+      "enabled": true
+    }
+  }
+}
+```
+
+`IFLOW_MCP_CLIENT: opencode` is accepted by the existing
+`[a-z0-9._-]{1,64}` validation in
+`packages/search-mcp/src/config.ts` — no code change is needed to add
+OpenCode as a host slug.
+
+Verify the wiring without launching the TUI:
+
+```bash
+opencode mcp list
+```
+
+A successful run prints `✓ iflow-search connected`. Add
+`--print-logs --log-level INFO` to confirm tool discovery — OpenCode
+logs `service=mcp key=iflow-search toolCount=3 create() successfully
+created client` once the child returns `tools/list`.
+
+> **OpenCode prefixes MCP tools with the server name in its tool
+> registry.** Your LLM will see `iflow-search_iflow_web_search`,
+> `iflow-search_iflow_image_search`, `iflow-search_iflow_web_fetch`. The
+> raw MCP names returned by `tools/list` remain `iflow_web_search` /
+> `iflow_image_search` / `iflow_web_fetch`; the `iflow-search_` prefix
+> is OpenCode's namespace, not part of this package.
+
+stdio is the supported transport here. OpenCode also supports remote
+MCP (`type: "remote"` with `url`), but this package only ships a stdio
+binary — no SSE / streamable-HTTP recommendation applies.
+
 After your client restarts, the three tools appear automatically:
 
 | Tool | What it does |
@@ -124,7 +198,7 @@ block of the MCP client config above.
 | `IFLOW_API_KEY` | yes | — | Bearer token sent to iFlow as `Authorization: Bearer ...`. |
 | `IFLOW_BASE_URL` | no | `https://platform.iflow.cn` | Override for testing / private deployments. |
 | `IFLOW_TIMEOUT_MS` | no | `30000` | Per-request timeout. Must be a positive integer if set. |
-| `IFLOW_MCP_CLIENT` | no | — | Declared MCP host name (e.g. `hermes`, `claude-code`, `claude-desktop`). When set, emitted as the `IFlow-MCP-Client` header so backend analytics can distinguish hosts. Allowed: `[a-z0-9._-]{1,64}`. Absent = no header sent (we never send a placeholder like `unknown`). |
+| `IFLOW_MCP_CLIENT` | no | — | Declared MCP host name (e.g. `hermes`, `claude-code`, `claude-desktop`, `opencode`). When set, emitted as the `IFlow-MCP-Client` header so backend analytics can distinguish hosts. Allowed: `[a-z0-9._-]{1,64}`. Absent = no header sent (we never send a placeholder like `unknown`). |
 | `IFLOW_MCP_CLIENT_VERSION` | no | — | Optional version for the above host. When both are set, emitted as `IFlow-MCP-Client-Version`. Allowed: `[A-Za-z0-9._+-]{1,64}`. Ignored unless `IFLOW_MCP_CLIENT` is set. |
 
 A missing or invalid configuration is a fatal init error: the process
