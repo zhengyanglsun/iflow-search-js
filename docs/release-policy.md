@@ -71,6 +71,19 @@ pnpm --filter @iflow-ai/search-langchain publish --access public
 - Real `IFLOW_API_KEY` / `DEEPSEEK_API_KEY` / any other provider key. Smoke scripts read these from the runtime environment.
 - Automated `npm publish` in CI. This is a deliberate decision — every release is reviewed and run by a human.
 
+## Official MCP Registry submission (`@iflow-ai/search-mcp` only)
+
+Registry entries live at <https://registry.modelcontextprotocol.io>; the registry itself only stores metadata, while the npm tarball stays on npmjs.org.
+
+Rules:
+
+1. **Namespace is `io.github.zhengyanglsun/iflow-search`.** Chosen for GitHub OAuth (`mcp-publisher login github`), which grants the `io.github.<gh-user>/*` namespace. If we later move to DNS-verified `cn.iflow.*` we cut a new registry entry — npm package name is unaffected.
+2. **`server.json#name` MUST equal `package.json#mcpName`.** Both currently read `io.github.zhengyanglsun/iflow-search`. They are the npm-side ownership-verification marker; the registry pulls the exact published tarball pinned in `server.json` and rejects publish if `mcpName` is missing or mismatched.
+3. **A new npm release is required to change `mcpName`.** The registry validator reads `mcpName` from `package.json` inside the npm tarball at `packages[0].version`. Older tarballs (e.g. `0.1.0-pre.1`) cannot be retrofitted — any change to `mcpName` requires a fresh `pnpm publish` of a new version.
+4. **Registry publish is a separate step from npm publish, and requires explicit per-release approval.** Order: (a) bump `search-mcp` version, (b) update `server.json#version` + `packages[0].version` to match, (c) run the normal pre-publish gate above, (d) `pnpm --filter @iflow-ai/search-mcp publish --access public --tag next`, (e) wait for `npm view @iflow-ai/search-mcp@<v> version` to surface, (f) `mcp-publisher login github` (interactive OAuth, browser device-code flow), (g) `mcp-publisher validate packages/search-mcp/server.json`, (h) `mcp-publisher publish packages/search-mcp/server.json`. Steps (f)–(h) are never run without an explicit maintainer go-ahead in the current session.
+5. **No registry automation in CI.** Same posture as npm publish — every registry update is reviewed and run by a human.
+6. **Schema pin.** `server.json#$schema` points at the dated draft (`2025-12-11`). Bumping it is its own change.
+
 ## When a release goes wrong
 
 - **Wrong version published to `latest`:** do not unpublish. Publish a corrected version (bump patch) and let users move forward. Unpublishing is destructive for any consumer that resolved the bad version.

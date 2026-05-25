@@ -1,0 +1,49 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.zhengyanglsun/iflow-search",
+  "title": "iFlow Search",
+  "description": "MCP server for iFlow Search web search, image search, and URL fetch tools.",
+  "version": "0.1.0-pre.2",
+  "repository": {
+    "source": "github",
+    "url": "https://github.com/zhengyanglsun/iflow-search-js",
+    "subfolder": "packages/search-mcp"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@iflow-ai/search-mcp",
+      "version": "0.1.0-pre.2",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "IFLOW_API_KEY",
+          "description": "Bearer token for the iFlow Search API. Obtain one at https://platform.iflow.cn.",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "IFLOW_MCP_CLIENT",
+          "description": "Optional MCP client slug forwarded to iFlow as the IFlow-MCP-Client header. Matches /^[a-z0-9._-]{1,64}$/.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "IFLOW_MCP_CLIENT_VERSION",
+          "description": "Optional MCP client version forwarded to iFlow as the IFlow-MCP-Client-Version header. Only honored when IFLOW_MCP_CLIENT is also set.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "IFLOW_BASE_URL",
+          "description": "Optional override for the iFlow Search API base URL. Defaults to https://platform.iflow.cn.",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}
