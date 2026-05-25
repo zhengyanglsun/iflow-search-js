@@ -26,6 +26,16 @@ npm install @iflow-ai/search-mcp
 
 Node ≥ 18.
 
+## Official MCP Registry
+
+This server is listed in the [Official MCP Registry](https://registry.modelcontextprotocol.io):
+
+- **Registry name:** `io.github.zhengyanglsun/iflow-search`
+- **npm package:** `@iflow-ai/search-mcp` on dist-tag `next`
+- **Transport:** `stdio`
+
+The registry stores metadata only — the package itself still installs from npm. MCP clients launch the server with `npx -y @iflow-ai/search-mcp@next`, which is the same command shown in the [Use it from an MCP client](#use-it-from-an-mcp-client) sections below.
+
 ## Use it from an MCP client
 
 ### Claude Code / Claude Desktop / generic `mcpServers` JSON

@@ -84,6 +84,16 @@ Rules:
 5. **No registry automation in CI.** Same posture as npm publish — every registry update is reviewed and run by a human.
 6. **Schema pin.** `server.json#$schema` points at the dated draft (`2025-12-11`). Bumping it is its own change.
 
+### Closure note (initial submission)
+
+The initial registry entry was published for `io.github.zhengyanglsun/iflow-search` version `0.1.0-pre.2` after the matching npm release of `@iflow-ai/search-mcp@0.1.0-pre.2`. Order is forced — the registry validator reads `mcpName` from the npm tarball, so the npm publish must land first.
+
+Future updates follow the same shape:
+
+1. If `server.json#version` (and therefore `packages[0].version`) changes, the matching npm version must publish to npm first — `mcp-publisher publish` will reject a `server.json` that points at an npm version the registry cannot resolve.
+2. After npm is live, run `mcp-publisher publish packages/search-mcp/server.json`. The CLI handles registry-side auth via GitHub OAuth (device-code flow); no registry token is stored in this repo or in CI.
+3. If a `server.json` change is metadata-only (e.g. description or env-var docs) **and** `packages[0].version` is unchanged, no new npm release is required — only step 2.
+
 ## When a release goes wrong
 
 - **Wrong version published to `latest`:** do not unpublish. Publish a corrected version (bump patch) and let users move forward. Unpublishing is destructive for any consumer that resolved the bad version.

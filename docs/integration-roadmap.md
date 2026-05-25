@@ -151,6 +151,7 @@ The phases below are the order we intend to ship work in. They are not deadlines
   - `iflow_web_fetch` — URL `https://example.com` — fetched and returned readable content.
 - ✅ Hygiene checks passed for both transports (local bin and `npx`-launched npm package): no JSON-RPC parse errors on the client side, no stdout pollution from the server (all diagnostics on stderr), no mid-call server disconnects, no failed `initialize` handshakes.
 - ⏳ Claude Code MCP client smoke outstanding — see Next integration priorities §1. Required as the second MCP client before promoting any version to dist-tag `latest`.
+- ✅ Official MCP Registry submission live as `io.github.zhengyanglsun/iflow-search` v `0.1.0-pre.2` (entry at <https://registry.modelcontextprotocol.io>). Registry stores metadata only — the npm tarball at `@iflow-ai/search-mcp@0.1.0-pre.2` (dist-tag `next`) remains the install source. Stable `0.1.0` is **not** released; the registry currently tracks the prerelease and a fresh registry publish is required whenever the npm version next changes (see [`release-policy.md`](./release-policy.md) §"Official MCP Registry submission").
 
 ### Phase 4 — Open WebUI / Coze / CrewAI
 
