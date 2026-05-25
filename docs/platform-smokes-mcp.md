@@ -5,10 +5,12 @@ package against real MCP-client hosts. Sibling of
 [`platform-smokes.md`](./platform-smokes.md), which covers the OpenAPI
 package against Open WebUI and Coze.
 
-Smoke target: **`@iflow-ai/search-mcp@next` = `0.1.0-pre.1`**
-(re-verify with `npm view @iflow-ai/search-mcp@next version`; the
-dist-tag on `latest` is intentionally still `0.1.0-pre.0` — see
-[release-policy.md](./release-policy.md)).
+Smoke target: **`@iflow-ai/search-mcp@next`**, at the version published at
+the time of each smoke (re-verify with
+`npm view @iflow-ai/search-mcp@next version`; the dist-tag on `latest` is
+intentionally still `0.1.0-pre.0` — see [release-policy.md](./release-policy.md)).
+The OpenCode and CrewAI smokes ran against `0.1.0-pre.1`; the Claude Code
+smoke ran against `0.1.0-pre.2`.
 
 The Hermes Agent smoke is recorded separately in
 [`integration-roadmap.md`](./integration-roadmap.md) Phase 3
@@ -222,10 +224,131 @@ deactivate
 rm -rf "$TMP"
 ```
 
+## Claude Code — passes via stdio MCP
+
+| | |
+|---|---|
+| Claude Code CLI version | `2.1.148-20260509.2` |
+| Invocation | `claude -p --strict-mcp-config --mcp-config <file> --no-session-persistence --permission-mode bypassPermissions --disable-slash-commands --output-format text "..."` |
+| Config file | session-scoped `mcp.json` written under a temporary `/tmp/iflow-claude-code-smoke-*` directory |
+| MCP transport | stdio |
+| Default `claude mcp list` *before* run | `No MCP servers configured.` |
+| Default `claude mcp list` *after* run | `No MCP servers configured.` (byte-identical — `claude mcp add` was never run) |
+| `tools/list` raw names | `iflow_web_search`, `iflow_image_search`, `iflow_web_fetch` |
+| `iflow_web_search` (`query="Claude Code MCP integration test", count=3`) | ✅ ok — first result *"Anyone using Claude Code and MCP's in your test flow? - Reddit"* (`reddit.com/r/softwaretesting/.../anyone_using_claude_code_and_mcps_in_your_test/`) |
+| `iflow_image_search` (`query="great wall of china", count=3`) | ✅ ok — first image source domain `en.wikipedia.org` |
+| `iflow_web_fetch` (`url="https://example.com"`) | ✅ ok — title `Example Domain`, 113 chars |
+| JSON-RPC parse errors | none |
+| stdout pollution from MCP server | none (banner stayed on stderr) |
+| Mid-call disconnects | none |
+| Tool-schema mismatch | none |
+| Permission prompt during `-p` mode | none (handled by `--permission-mode bypassPermissions`) |
+| Response truncation | none observed |
+| `IFLOW_MCP_CLIENT=claude-code` | accepted by the existing `[a-z0-9._-]{1,64}` validation in `packages/search-mcp/src/config.ts` — no code change required |
+
+### The `mcp.json` used for the green run
+
+The temporary config file contained **no secrets** — only the non-secret
+`IFLOW_MCP_CLIENT` / `IFLOW_MCP_CLIENT_VERSION` values:
+
+```json
+{
+  "mcpServers": {
+    "iflow-search": {
+      "command": "npx",
+      "args": ["-y", "@iflow-ai/search-mcp@next"],
+      "env": {
+        "IFLOW_MCP_CLIENT": "claude-code",
+        "IFLOW_MCP_CLIENT_VERSION": "2.1.148"
+      }
+    }
+  }
+}
+```
+
+`IFLOW_API_KEY` was inherited from the parent shell env. Claude Code's
+stdio MCP child layer spreads the parent `process.env` to the spawned
+subprocess, so no key value had to be written into `mcp.json`. The key
+was never written to a config file, an `.env` file, a tracked file, the
+smoke prompt, Claude Code's stdout / stderr, the MCP server's stdout /
+stderr, or any log file.
+
+### Isolation guarantees
+
+The `--strict-mcp-config` + `--mcp-config <file>` combination loaded the
+`iflow-search` server **only for the single `claude -p` invocation**. No
+persistent user / project / local MCP config was created or modified:
+
+- `claude mcp add` was never run.
+- The temporary `mcp.json` (`/tmp/iflow-claude-code-smoke-*/mcp.json`)
+  was removed after the run.
+- The default `claude mcp list` output was byte-identical before and
+  after the smoke.
+- No leftover `@iflow-ai/search-mcp` or `node` child processes were
+  observed (`ps -ef | grep search-mcp` returned nothing).
+- `--no-session-persistence` skipped writing the `-p` conversation to
+  Claude Code's session store.
+
+### Caveat — what this smoke did NOT exercise
+
+`-p` non-interactive mode runs a single Anthropic LLM round trip that
+decides which MCP tools to call. That covers the full iFlow-facing wire
+path — transport, handshake, `tools/list`, `callTool`, response
+shaping — and additionally exercises Claude Code's MCP client layer
+end-to-end (server resolution from `--mcp-config`, env propagation to
+the stdio child, tool registration in the model's tool catalog,
+permission gating). What's NOT covered is interactive-session UI
+behavior (TUI tool-call approval prompts, persistent session
+resumption, slash-command interactions with the server) — those are
+Claude Code UX paths, not iFlow paths, and they run the same code path
+Claude Code uses for any other MCP server.
+
+### Reproduction sketch
+
+```bash
+# 1. Export the key in your shell — never write it into mcp.json.
+export IFLOW_API_KEY="YOUR_IFLOW_API_KEY"
+
+# 2. Create a temp directory + session-scoped MCP config.
+TMP=$(mktemp -d /tmp/iflow-claude-code-smoke-XXXXXX)
+cat > "$TMP/mcp.json" <<'EOF'
+{
+  "mcpServers": {
+    "iflow-search": {
+      "command": "npx",
+      "args": ["-y", "@iflow-ai/search-mcp@next"],
+      "env": {
+        "IFLOW_MCP_CLIENT": "claude-code"
+      }
+    }
+  }
+}
+EOF
+
+# 3. Run Claude Code with the isolated config. --strict-mcp-config
+#    ignores every other MCP source; --no-session-persistence skips the
+#    session save; --mcp-config loads only this file for this one
+#    invocation. Persistent user/project/local MCP config is not touched.
+claude -p \
+  --strict-mcp-config \
+  --mcp-config "$TMP/mcp.json" \
+  --no-session-persistence \
+  --permission-mode bypassPermissions \
+  --disable-slash-commands \
+  --output-format text \
+  "Call iflow_web_search, iflow_image_search, iflow_web_fetch once each and summarize."
+
+# 4. Confirm the persistent MCP list is unchanged.
+claude mcp list   #  →  No MCP servers configured.   (or your prior list, unchanged)
+
+# 5. Clean up.
+rm -rf "$TMP"
+```
+
 ## Trust boundary
 
-Both smokes (OpenCode and CrewAI) ran against the real iFlow Search
-API. No mocks involved. Wire paths:
+All three smokes (OpenCode, CrewAI, and Claude Code) ran against the real
+iFlow Search API. No mocks involved. Wire paths:
 
 - **OpenCode**: OpenCode CLI (holds parent env including
   `IFLOW_API_KEY`) → stdio child `npx -y @iflow-ai/search-mcp@next`
@@ -240,13 +363,20 @@ API. No mocks involved. Wire paths:
   inherits `IFLOW_API_KEY` and sets `IFlow-Source: mcp`,
   `IFlow-MCP-Client: crewai`, `Authorization: Bearer …`) →
   `https://platform.iflow.cn`.
+- **Claude Code**: `claude -p --strict-mcp-config --mcp-config <file>`
+  (holds parent env including `IFLOW_API_KEY`) → stdio child
+  `npx -y @iflow-ai/search-mcp@next` (inherits `IFLOW_API_KEY` via
+  Claude Code's parent-env spread to the stdio MCP child; sets
+  `IFlow-Source: mcp`, `IFlow-MCP-Client: claude-code`,
+  `Authorization: Bearer …`) → `https://platform.iflow.cn`.
 
-`IFLOW_API_KEY` never leaves the `search-mcp` process in either
-topology. OpenCode itself sees the key in its own `process.env`
+`IFLOW_API_KEY` never leaves the `search-mcp` process in any of these
+topologies. OpenCode itself sees the key in its own `process.env`
 (since the operator exported it in the shell that launched OpenCode);
-the CrewAI smoke script sees it in `os.environ` for the same reason.
-Neither host's outbound network calls (to its LLM provider, in
-either case) were configured during these smokes.
+the CrewAI smoke script sees it in `os.environ` for the same reason;
+Claude Code sees it in its own `process.env` (exported in the shell
+that ran `claude -p`). None of the hosts' outbound network calls (to
+their LLM providers) were configured to forward `IFLOW_API_KEY`.
 
 `DEEPSEEK_API_KEY` was not used by either smoke; it appears only in
 `examples/langgraph-agent` and is not read by `@iflow-ai/search-mcp`.
@@ -266,6 +396,11 @@ either case) were configured during these smokes.
   driven by `crewai`'s own dep tree, not by anything iFlow ships).
   Removed after the run. `npx` also cached `@iflow-ai/search-mcp@next`
   in npm's cache directory; clearable the same way.
+- The Claude Code smoke wrote only `/tmp/iflow-claude-code-smoke-*/mcp.json`
+  (no secrets) and removed it afterwards. `--no-session-persistence`
+  prevented Claude Code from saving the `-p` conversation to its
+  session store. `npx` cached `@iflow-ai/search-mcp@next` in npm's
+  cache directory; clearable with `npm cache clean --force`.
 
 ## See also
 

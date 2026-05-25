@@ -76,6 +76,17 @@ is sent (the request is still attributed to `IFlow-Source: mcp`).
 > override file ignored by git, a `direnv` block, etc.). `@iflow-ai/search-mcp`
 > never reads from disk and will not pick up a `.env` automatically.
 
+> **Verified host.** Claude Code is a verified MCP host for this package —
+> end-to-end stdio smoke green on `@iflow-ai/search-mcp@0.1.0-pre.2` with
+> Claude Code CLI `2.1.148-20260509.2`, all three tools exercised against the
+> real iFlow Search API. For one-off smoke / evaluation runs that must not
+> touch your persistent Claude Code config, use a session-scoped config file
+> with `claude -p --strict-mcp-config --mcp-config <file> --no-session-persistence …`
+> and let `IFLOW_API_KEY` reach the MCP child via Claude Code's parent-env
+> spread (do NOT write the key into the temp `mcp.json`). The reproduction
+> sketch is in
+> [`docs/platform-smokes-mcp.md`](../../docs/platform-smokes-mcp.md).
+
 ### Hermes Agent
 
 Add the server to `~/.hermes/config.yaml`:
