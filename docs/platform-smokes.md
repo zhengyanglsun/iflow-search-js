@@ -113,6 +113,38 @@ never include a real `IFLOW_API_KEY` or any bearer-style token, and verify
 with a `grep -E '"security"|BearerAuth|securitySchemes|Authorization|sk-'`
 scan before pasting.
 
+## Trust boundary
+
+Both smokes ran against the real iFlow Search API. No mocks were
+involved — the wire shapes (e.g. `results.items.{title,url,snippet}`,
+`images.items.{imageUrl,sourceUrl}`, `web_fetch.data.{url,content,fromCache}`)
+were verified against `packages/search-core/src/normalize.ts`.
+
+Wire path of each smoke:
+
+- **Open WebUI**: OWUI (same host) → `http://localhost:8787`
+  (search-openapi process; holds `IFLOW_API_KEY` in its process env) →
+  `https://platform.iflow.cn` (real iFlow Search API).
+- **Coze**: Coze cloud → cloudflared quick tunnel → `http://127.0.0.1:8787`
+  (search-openapi process; holds `IFLOW_API_KEY` in its process env) →
+  `https://platform.iflow.cn`.
+
+In both topologies `IFLOW_API_KEY` never leaves the search-openapi
+process. The platform (Open WebUI or Coze) only ever sees (a) the
+OpenAPI server's URL and (b) — at most — an operator-chosen
+`IFLOW_OPENAPI_AUTH_TOKEN`, which is **not** the iFlow key.
+
+Coze ran in open mode (no `IFLOW_OPENAPI_AUTH_TOKEN`) because of the
+`AuthenticationFunc` limitation documented above. For a production-style
+Coze deployment, push the auth gate to the tunnel / reverse-proxy layer
+(Cloudflare Access policy on a named tunnel, an nginx layer that checks
+a fixed header before proxying, or a managed API gateway in front of the
+server) — not to `IFLOW_OPENAPI_AUTH_TOKEN`, which Coze cannot satisfy.
+
+`DEEPSEEK_API_KEY` is unrelated to the OpenAPI smokes — it appears only
+in `examples/langgraph-agent` to authenticate that demo's LLM, and is
+not read by `@iflow-ai/search-openapi`.
+
 ## Next-step notes for `pre.2` / `0.2.0`
 
 In priority order:

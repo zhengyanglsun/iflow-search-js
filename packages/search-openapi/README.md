@@ -66,6 +66,26 @@ All configuration is read from `process.env`.
 A missing or invalid configuration is a fatal init error: the process
 writes a one-line diagnostic to **stderr** and exits with code `1`.
 
+### Key boundary
+
+Two values in this package are bearer-shaped — keep them separate:
+
+| | `IFLOW_API_KEY` | `IFLOW_OPENAPI_AUTH_TOKEN` |
+|---|---|---|
+| What it is | Your iFlow account key | A token you invent to protect your server |
+| Origin | Issued by iFlow for your account | Operator-chosen (any opaque string) |
+| Who reads it | This server only (via `@iflow-ai/search-core`) | This server only (timing-safe-compared in `auth.ts`) |
+| Who else sees the value | Sent upstream as `Authorization: Bearer` to `platform.iflow.cn` | Pasted into the platform's "Bearer Token" field — never sent to iFlow |
+
+**Open WebUI and Coze never receive `IFLOW_API_KEY`.** They talk only to
+this server's HTTP endpoints; the iFlow key lives in the server's
+process env and is only ever transmitted upstream to iFlow.
+
+`DEEPSEEK_API_KEY` is unrelated to this package. It appears only in the
+`examples/langgraph-agent` demo to authenticate that demo's LLM, and is
+never read by `@iflow-ai/search-openapi`, `@iflow-ai/search-mcp`,
+`@iflow-ai/search-langchain`, or `@iflow-ai/search-core`.
+
 ## Curl smoke test
 
 With the server running locally (open mode):
@@ -185,14 +205,30 @@ Coze can register an external tool from an OpenAPI 3.x document:
 
 1. **Plugins → Create plugin → Import from OpenAPI.**
 2. URL: `https://<your-host>/openapi.json`.
-3. Authentication: *Bearer Token*. Paste the value of
-   `IFLOW_OPENAPI_AUTH_TOKEN` if set; leave blank for open mode.
+3. **Authentication: *None* (open mode).** Coze's plugin runtime ignores
+   OpenAPI-declared `securitySchemes` and rejects spec-declared `BearerAuth`
+   at runtime with `security requirements failed: missing AuthenticationFunc`
+   — the runtime expects an out-of-band `AuthenticationFunc` callback that
+   an imported JSON/YAML spec cannot supply. Until Coze adds a binding for
+   spec-declared bearer schemes, do **not** set `IFLOW_OPENAPI_AUTH_TOKEN`
+   when targeting Coze — start the server in open mode and leave Coze's
+   Authentication field set to None.
 4. Select all three tools to expose to the agent.
 
 For Coze you generally need a publicly reachable URL — terminate TLS in
-front of the server (Caddy, Nginx, your platform's load balancer) and
-keep `IFLOW_OPENAPI_AUTH_TOKEN` non-empty so the endpoint is not open
-to the internet.
+front of the server (Caddy, Nginx, your platform's load balancer) or
+expose it through a tunnel (cloudflared, ngrok).
+
+**Push the auth gate to the tunnel / reverse-proxy layer**, not to
+`IFLOW_OPENAPI_AUTH_TOKEN` — Coze cannot satisfy the spec-declared
+bearer scheme (see step 3). Practical options:
+
+- A named Cloudflare tunnel with a [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/applications/) policy in front (service token or identity-based).
+- Nginx / Caddy in front of the server that checks a fixed header
+  (e.g. `X-Tunnel-Auth: <opaque>`) before proxying to `127.0.0.1:8787`.
+- A managed API gateway that enforces auth before reaching the server.
+
+In all of these the search-openapi server itself stays in open mode.
 
 ## Programmatic API
 
