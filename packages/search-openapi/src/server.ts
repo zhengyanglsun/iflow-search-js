@@ -4,6 +4,7 @@
  * Routes:
  *   GET  /health                       — liveness, never gated by bearer auth
  *   GET  /openapi.json                 — OpenAPI 3.1 schema (bearer-gated when configured)
+ *   GET  /openapi.coze.json            — OpenAPI 3.0.3 schema with no security (bearer-gated when configured)
  *   POST /tools/iflow_web_search       — search-core webSearch passthrough
  *   POST /tools/iflow_image_search     — search-core imageSearch passthrough
  *   POST /tools/iflow_web_fetch        — search-core webFetch passthrough
@@ -15,7 +16,12 @@
  *     live in @iflow-ai/search-core. This server only translates between
  *     JSON-over-HTTP and the typed search-core client.
  *   - The handler list is the single source of truth for both the routes
- *     and /openapi.json.
+ *     and the two OpenAPI documents.
+ *   - The Coze-flavored document never declares BearerAuth even when the
+ *     server is configured with IFLOW_OPENAPI_AUTH_TOKEN — Coze's runtime
+ *     rejects spec-declared bearer with `missing AuthenticationFunc`. The
+ *     bearer-gate check itself still runs on /openapi.coze.json identically
+ *     to /openapi.json; that is an operator concern documented in the README.
  *   - Body size is capped at MAX_BODY_BYTES to keep tool platforms from
  *     accidentally streaming megabytes into the server.
  */
@@ -42,17 +48,43 @@ export interface AppOptions {
    * the value so it is safe to copy verbatim into a response header.
    */
   corsOrigin?: string | undefined;
+  /**
+   * Absolute http(s) base URL injected into `servers[]` of both OpenAPI
+   * documents. Coze requires this — its plugin runtime resolves the upstream
+   * server URL from the document, not from the import URL. Open WebUI ignores
+   * `servers[]` (it always uses the tool-server URL the operator pasted).
+   * Validated by config.ts.
+   */
+  publicUrl?: string | undefined;
+  /**
+   * Cache-buster appended to every operationId in both documents
+   * (`iflow_web_search_<suffix>`, …). Default unset = canonical names.
+   */
+  operationSuffix?: string | undefined;
 }
 
 const CORS_ALLOWED_HEADERS = "Content-Type, Authorization, X-Session-Id";
 const CORS_ALLOWED_METHODS = "GET, POST, OPTIONS";
 
 export function createApp(options: AppOptions): RequestListener {
-  const { client, authToken, corsOrigin } = options;
-  const openApiDocument = buildOpenApiDocument({
-    bearerAuth: authToken !== undefined,
-  });
-  const openApiJson = JSON.stringify(openApiDocument);
+  const { client, authToken, corsOrigin, publicUrl, operationSuffix } = options;
+  const bearerAuth = authToken !== undefined;
+  const canonicalJson = JSON.stringify(
+    buildOpenApiDocument({
+      profile: "canonical",
+      bearerAuth,
+      publicUrl,
+      operationSuffix,
+    }),
+  );
+  const cozeJson = JSON.stringify(
+    buildOpenApiDocument({
+      profile: "coze",
+      bearerAuth,
+      publicUrl,
+      operationSuffix,
+    }),
+  );
 
   const handlersByPath = new Map<string, ToolHandler>();
   for (const handler of TOOL_HANDLERS) {
@@ -98,7 +130,11 @@ export function createApp(options: AppOptions): RequestListener {
       }
 
       if (method === "GET" && pathname === "/openapi.json") {
-        return sendRawJson(res, 200, openApiJson);
+        return sendRawJson(res, 200, canonicalJson);
+      }
+
+      if (method === "GET" && pathname === "/openapi.coze.json") {
+        return sendRawJson(res, 200, cozeJson);
       }
 
       const toolHandler = handlersByPath.get(pathname);

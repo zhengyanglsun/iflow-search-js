@@ -33,12 +33,16 @@ async function startServer(options: {
   fetchImpl: typeof fetch;
   authToken?: string;
   corsOrigin?: string;
+  publicUrl?: string;
+  operationSuffix?: string;
 }): Promise<Harness> {
   const client = buildClient(options.fetchImpl);
   const app = createApp({
     client,
     authToken: options.authToken,
     corsOrigin: options.corsOrigin,
+    publicUrl: options.publicUrl,
+    operationSuffix: options.operationSuffix,
   });
   const server: Server = createServer(app);
   await new Promise<void>((resolve) => {
@@ -110,6 +114,100 @@ describe("HTTP server", () => {
     expect(ok.status).toBe(200);
     const doc = (await ok.json()) as { components: { securitySchemes: unknown } };
     expect(doc.components.securitySchemes).toBeDefined();
+  });
+
+  // ── /openapi.coze.json ────────────────────────────────────────────────────
+
+  it("GET /openapi.coze.json returns the Coze-flavored document in open mode", async () => {
+    harness = await startServer({
+      fetchImpl: vi.fn(async () => jsonResponse({ success: true, data: { organic: [] } })),
+    });
+    const res = await fetch(`${harness.url}/openapi.coze.json`);
+    expect(res.status).toBe(200);
+    const doc = (await res.json()) as {
+      openapi: string;
+      paths: Record<string, unknown>;
+      components?: unknown;
+    };
+    expect(doc.openapi).toBe("3.0.3");
+    expect(Object.keys(doc.paths)).toContain("/tools/iflow_web_search");
+    expect(doc.components).toBeUndefined();
+  });
+
+  it("GET /openapi.coze.json never declares BearerAuth even when authToken is set", async () => {
+    harness = await startServer({
+      fetchImpl: vi.fn(async () => jsonResponse({ success: true, data: { organic: [] } })),
+      authToken: "secret-token",
+    });
+    const res = await fetch(`${harness.url}/openapi.coze.json`, {
+      headers: { Authorization: "Bearer secret-token" },
+    });
+    expect(res.status).toBe(200);
+    const doc = (await res.json()) as {
+      openapi: string;
+      components?: unknown;
+      paths: Record<string, { post: { security?: unknown } }>;
+    };
+    expect(doc.openapi).toBe("3.0.3");
+    expect(doc.components).toBeUndefined();
+    for (const item of Object.values(doc.paths)) {
+      expect(item.post.security).toBeUndefined();
+    }
+  });
+
+  it("GET /openapi.coze.json is bearer-gated like /openapi.json when configured", async () => {
+    harness = await startServer({
+      fetchImpl: vi.fn(async () => jsonResponse({ success: true, data: { organic: [] } })),
+      authToken: "secret-token",
+    });
+    const denied = await fetch(`${harness.url}/openapi.coze.json`);
+    expect(denied.status).toBe(401);
+  });
+
+  it("GET /openapi.coze.json includes servers[] when publicUrl is set", async () => {
+    harness = await startServer({
+      fetchImpl: vi.fn(async () => jsonResponse({ success: true, data: { organic: [] } })),
+      publicUrl: "https://iflow.example.com",
+    });
+    const res = await fetch(`${harness.url}/openapi.coze.json`);
+    expect(res.status).toBe(200);
+    const doc = (await res.json()) as {
+      servers?: Array<{ url: string }>;
+    };
+    expect(doc.servers).toEqual([{ url: "https://iflow.example.com" }]);
+  });
+
+  it("GET /openapi.coze.json applies operationSuffix to operationIds", async () => {
+    harness = await startServer({
+      fetchImpl: vi.fn(async () => jsonResponse({ success: true, data: { organic: [] } })),
+      operationSuffix: "open3",
+    });
+    const res = await fetch(`${harness.url}/openapi.coze.json`);
+    expect(res.status).toBe(200);
+    const doc = (await res.json()) as {
+      paths: Record<string, { post: { operationId: string } }>;
+    };
+    expect(doc.paths["/tools/iflow_web_search"].post.operationId).toBe(
+      "iflow_web_search_open3",
+    );
+  });
+
+  it("OPTIONS /openapi.coze.json returns 204 with CORS headers", async () => {
+    harness = await startServer({
+      fetchImpl: vi.fn(async () => jsonResponse({ success: true, data: { organic: [] } })),
+      corsOrigin: "http://localhost:3000",
+    });
+    const res = await fetch(`${harness.url}/openapi.coze.json`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: "http://localhost:3000",
+        "Access-Control-Request-Method": "GET",
+      },
+    });
+    expect(res.status).toBe(204);
+    expect(res.headers.get("access-control-allow-origin")).toBe(
+      "http://localhost:3000",
+    );
   });
 
   // ── tool dispatch ─────────────────────────────────────────────────────────

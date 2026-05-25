@@ -52,8 +52,23 @@ async function main(): Promise<void> {
     client,
     authToken: config.authToken,
     corsOrigin: config.corsOrigin,
+    publicUrl: config.publicUrl,
+    operationSuffix: config.operationSuffix,
   });
   const httpServer = createServer(app);
+
+  // Coze's plugin runtime rejects spec-declared BearerAuth at execute time
+  // with `missing AuthenticationFunc`. /openapi.coze.json therefore never
+  // declares security, but the server-side bearer gate (auth.ts) still runs
+  // on that route — so a Coze import will succeed and every Coze tool call
+  // will 401. Warn at startup so the operator catches this before deploying.
+  if (config.authToken !== undefined) {
+    process.stderr.write(
+      `[${INTEGRATION_NAME}] note: /openapi.coze.json does not declare BearerAuth; ` +
+        "Coze cannot satisfy IFLOW_OPENAPI_AUTH_TOKEN. " +
+        "Put auth at the tunnel / reverse-proxy layer for Coze deployments.\n",
+    );
+  }
 
   const shutdown = (signal: NodeJS.Signals): void => {
     process.stderr.write(`[${INTEGRATION_NAME}] received ${signal}, closing.\n`);
@@ -86,8 +101,12 @@ async function main(): Promise<void> {
       : "bearer auth DISABLED (open mode)";
     const clientNote = config.clientName ? ` client=${config.clientName}` : "";
     const corsNote = config.corsOrigin ? ` cors=${config.corsOrigin}` : "";
+    const publicNote = config.publicUrl ? ` public=${config.publicUrl}` : "";
+    const suffixNote = config.operationSuffix
+      ? ` opsfx=${config.operationSuffix}`
+      : "";
     process.stderr.write(
-      `[${INTEGRATION_NAME}] v${VERSION} listening on http://0.0.0.0:${boundPort} — ${authNote}${clientNote}${corsNote}\n`,
+      `[${INTEGRATION_NAME}] v${VERSION} listening on http://0.0.0.0:${boundPort} — ${authNote}${clientNote}${corsNote}${publicNote}${suffixNote}\n`,
     );
   });
 }

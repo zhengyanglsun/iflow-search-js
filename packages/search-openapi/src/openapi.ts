@@ -1,28 +1,103 @@
 /**
- * OpenAPI 3.1 description served at /openapi.json.
+ * OpenAPI description served at /openapi.json (canonical) and
+ * /openapi.coze.json (Coze-flavored).
  *
- * Open WebUI and Coze (and other OpenAPI 3.x tool hosts) read this
- * document to populate their tool catalogs. The schema is generated
- * from the canonical TOOL_HANDLERS list so the document and the routes
- * can never drift.
+ * Open WebUI consumes the canonical 3.1.0 document; Coze cannot parse 3.1
+ * and additionally rejects spec-declared BearerAuth at execute time with
+ * `missing AuthenticationFunc`. The Coze flavor downgrades to 3.0.3 and
+ * strips every security declaration; the server-side bearer gate still
+ * applies independently of what the spec advertises.
  *
- * Auth: when `bearerAuth` is true, every operation declares the
- * `BearerAuth` security scheme; consumers will require the user to
- * paste a token. /health is intentionally excluded from this document
- * — it's a private liveness check, not a tool.
+ * Both profiles share the same paths, the same operationIds (modulo the
+ * optional IFLOW_OPENAPI_OPERATION_SUFFIX cache-buster), the same request
+ * schemas, and the same concrete inline 200 response schemas — so prompts
+ * written against one runtime keep working under another.
  */
 
 import { TOOL_HANDLERS } from "./handlers/index.js";
 import { VERSION } from "./version.js";
 
+export type OpenApiProfile = "canonical" | "coze";
+
 export interface OpenApiDocumentOptions {
-  /** True when IFLOW_OPENAPI_AUTH_TOKEN is configured. */
+  /** Profile selects OAS version and security shape. Default: "canonical". */
+  profile?: OpenApiProfile;
+  /** True when IFLOW_OPENAPI_AUTH_TOKEN is configured. Ignored when profile === "coze". */
   bearerAuth: boolean;
+  /** Absolute http(s) base URL injected into `servers[]` when set. */
+  publicUrl?: string | undefined;
+  /** Cache-buster appended to operationIds (`iflow_web_search_<suffix>`, …). */
+  operationSuffix?: string | undefined;
 }
+
+const SUCCESS_SCHEMAS: Record<string, object> = {
+  iflow_web_search: {
+    type: "object",
+    required: ["query", "count", "tookMs", "results"],
+    properties: {
+      query: { type: "string" },
+      count: { type: "integer" },
+      tookMs: { type: "integer" },
+      results: {
+        type: "array",
+        items: {
+          type: "object",
+          required: ["title", "url", "snippet"],
+          properties: {
+            title: { type: "string" },
+            url: { type: "string" },
+            snippet: { type: "string" },
+            position: { type: "integer" },
+            date: { type: "string" },
+          },
+        },
+      },
+    },
+  },
+  iflow_image_search: {
+    type: "object",
+    required: ["query", "count", "tookMs", "images"],
+    properties: {
+      query: { type: "string" },
+      count: { type: "integer" },
+      tookMs: { type: "integer" },
+      images: {
+        type: "array",
+        items: {
+          type: "object",
+          required: ["imageUrl"],
+          properties: {
+            imageUrl: { type: "string" },
+            title: { type: "string" },
+            sourceUrl: { type: "string" },
+            width: { type: "integer" },
+            height: { type: "integer" },
+            position: { type: "integer" },
+          },
+        },
+      },
+    },
+  },
+  iflow_web_fetch: {
+    type: "object",
+    required: ["url", "content", "tookMs"],
+    properties: {
+      url: { type: "string" },
+      title: { type: "string" },
+      content: { type: "string" },
+      fromCache: { type: "boolean" },
+      tookMs: { type: "integer" },
+    },
+  },
+};
 
 export function buildOpenApiDocument(
   options: OpenApiDocumentOptions,
 ): object {
+  const profile: OpenApiProfile = options.profile ?? "canonical";
+  const isCoze = profile === "coze";
+  const includeSecurity = !isCoze && options.bearerAuth;
+
   const errorSchema = {
     type: "object",
     required: ["ok", "error"],
@@ -41,13 +116,19 @@ export function buildOpenApiDocument(
     },
   } as const;
 
-  const security = options.bearerAuth ? [{ BearerAuth: [] as string[] }] : [];
+  const security = includeSecurity ? [{ BearerAuth: [] as string[] }] : [];
+
+  const suffix = options.operationSuffix
+    ? `_${options.operationSuffix}`
+    : "";
 
   const paths: Record<string, object> = {};
   for (const handler of TOOL_HANDLERS) {
+    const successDataSchema =
+      SUCCESS_SCHEMAS[handler.name] ?? { type: "object" };
     paths[`/tools/${handler.name}`] = {
       post: {
-        operationId: handler.name,
+        operationId: `${handler.name}${suffix}`,
         summary: handler.title,
         description: handler.description,
         ...(security.length > 0 ? { security } : {}),
@@ -69,7 +150,7 @@ export function buildOpenApiDocument(
                   required: ["ok", "data"],
                   properties: {
                     ok: { type: "boolean", enum: [true] },
-                    data: { type: "object" },
+                    data: successDataSchema,
                   },
                 },
               },
@@ -99,7 +180,7 @@ export function buildOpenApiDocument(
   }
 
   const document: Record<string, unknown> = {
-    openapi: "3.1.0",
+    openapi: isCoze ? "3.0.3" : "3.1.0",
     info: {
       title: "iFlow Search OpenAPI",
       version: VERSION,
@@ -111,7 +192,11 @@ export function buildOpenApiDocument(
     paths,
   };
 
-  if (options.bearerAuth) {
+  if (options.publicUrl) {
+    document.servers = [{ url: options.publicUrl }];
+  }
+
+  if (includeSecurity) {
     document.components = {
       securitySchemes: {
         BearerAuth: {

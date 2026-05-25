@@ -15,7 +15,8 @@ runtime keep working verbatim under another.
   Fastify, or Koa dependency.
 - **Endpoints:**
   - `GET /health` — liveness probe. Never gated by the bearer guard.
-  - `GET /openapi.json` — OpenAPI 3.1 document for tool catalogs.
+  - `GET /openapi.json` — OpenAPI **3.1** document for Open WebUI and other 3.1-capable tool catalogs.
+  - `GET /openapi.coze.json` — OpenAPI **3.0.3** document for Coze and other hosts that cannot parse 3.1. Same tool routes, same operationIds, same request / response schemas; only the OAS version and the security advertisement differ.
   - `POST /tools/iflow_web_search`
   - `POST /tools/iflow_image_search`
   - `POST /tools/iflow_web_fetch`
@@ -62,6 +63,8 @@ All configuration is read from `process.env`.
 | `IFLOW_OPENAPI_AUTH_TOKEN` | no | — | When set, every endpoint **except** `/health` requires `Authorization: Bearer <token>`. Constant-time compared. Absent = open mode (no auth gate). |
 | `IFLOW_OPENAPI_CLIENT` | no | — | Identifies the host platform (`open-webui`, `coze`, …). Allowed: `[a-z0-9._-]{1,64}`. Captured into the startup banner; not forwarded to iFlow today. |
 | `IFLOW_OPENAPI_CORS_ORIGIN` | no | — | When set, every response carries `Access-Control-Allow-Origin: <value>` plus the matching `Access-Control-Allow-Headers / Methods` and `Vary: Origin`, and `OPTIONS` preflights short-circuit to `204` (no bearer required). Required for **browser-side** tool imports (Open WebUI's user/global tool servers, Coze's plugin importer). Accepts `*` or `http(s)://host[:port]` — any path, query, fragment, or non-printable character is rejected at startup. |
+| `IFLOW_OPENAPI_PUBLIC_URL` | no | — | Absolute `http(s)://host[:port]` base URL injected into `servers[0].url` of both `/openapi.json` and `/openapi.coze.json`. Required for Coze, which resolves the upstream server URL from the imported document, not from the import URL. Open WebUI ignores `servers[]` (it dispatches to whatever tool-server URL the operator pasted). Accepts only `http(s)://host[:port]` — wildcards, paths, queries, fragments, and non-printable characters are rejected at startup. |
+| `IFLOW_OPENAPI_OPERATION_SUFFIX` | no | — | Cache-busting suffix appended to every `operationId` (`iflow_web_search_<suffix>`, …). URL paths stay canonical. Default unset = canonical operationIds. Useful when a host's plugin-import cache keys collide with a prior version of the spec. Allowed: `[a-z0-9_-]{1,32}`. |
 
 A missing or invalid configuration is a fatal init error: the process
 writes a one-line diagnostic to **stderr** and exits with code `1`.
@@ -94,8 +97,11 @@ With the server running locally (open mode):
 # Liveness
 curl -s http://127.0.0.1:8787/health
 
-# Tool catalog
+# Tool catalog (Open WebUI, OpenAPI 3.1)
 curl -s http://127.0.0.1:8787/openapi.json | jq '.paths | keys'
+
+# Tool catalog (Coze, OpenAPI 3.0.3, no security)
+curl -s http://127.0.0.1:8787/openapi.coze.json | jq '{openapi, paths: (.paths | keys), components}'
 
 # Web search
 curl -s -X POST http://127.0.0.1:8787/tools/iflow_web_search \
@@ -201,34 +207,67 @@ Then in Open WebUI:
 
 ## Coze (custom tool / plugin)
 
-Coze can register an external tool from an OpenAPI 3.x document:
+Coze can register an external tool from an OpenAPI 3.x document. **Point
+Coze at `/openapi.coze.json`, not `/openapi.json`.** The Coze-flavored
+document is generated from the same handler list as canonical — same
+routes, same operationIds, same request / response schemas — but two
+things are different by design:
 
-1. **Plugins → Create plugin → Import from OpenAPI.**
-2. URL: `https://<your-host>/openapi.json`.
-3. **Authentication: *None* (open mode).** Coze's plugin runtime ignores
-   OpenAPI-declared `securitySchemes` and rejects spec-declared `BearerAuth`
-   at runtime with `security requirements failed: missing AuthenticationFunc`
-   — the runtime expects an out-of-band `AuthenticationFunc` callback that
-   an imported JSON/YAML spec cannot supply. Until Coze adds a binding for
-   spec-declared bearer schemes, do **not** set `IFLOW_OPENAPI_AUTH_TOKEN`
-   when targeting Coze — start the server in open mode and leave Coze's
-   Authentication field set to None.
-4. Select all three tools to expose to the agent.
+- `openapi: "3.0.3"` instead of `3.1.0`. Coze rejects 3.1 at import time
+  with `Invalid params`.
+- No `security` block, no `components.securitySchemes` — ever. Coze's
+  plugin runtime rejects spec-declared `BearerAuth` at execute time with
+  `security requirements failed: missing AuthenticationFunc`, because it
+  expects an out-of-band callback that an imported document cannot
+  supply.
+
+Steps:
+
+1. Set `IFLOW_OPENAPI_PUBLIC_URL` to the publicly reachable base URL Coze
+   will dial back to (e.g. `https://<your-host>` or your tunnel URL).
+   Coze resolves the upstream server URL from the document's `servers[0].url`,
+   not from the URL you paste at import time, so this env var is effectively
+   required for Coze deployments.
+2. Start the server. The Coze document at
+   `https://<your-host>/openapi.coze.json` will carry `openapi: "3.0.3"`,
+   the requested `servers[0].url`, no security block, and the same three
+   `iflow_*` tool routes with concrete inline `data` schemas.
+3. In Coze: **Plugins → Create plugin → Import from OpenAPI.**
+4. URL: `https://<your-host>/openapi.coze.json`.
+5. **Authentication: *None***. The Coze document advertises no security
+   scheme; do not configure one on Coze's side either.
+6. Select all three tools to expose to the agent.
 
 For Coze you generally need a publicly reachable URL — terminate TLS in
 front of the server (Caddy, Nginx, your platform's load balancer) or
-expose it through a tunnel (cloudflared, ngrok).
+expose it through a tunnel (cloudflared, ngrok). **Coze never receives
+`IFLOW_API_KEY`** — only this server does, in its process env. The iFlow
+key is transmitted upstream to `platform.iflow.cn` and nowhere else.
 
-**Push the auth gate to the tunnel / reverse-proxy layer**, not to
-`IFLOW_OPENAPI_AUTH_TOKEN` — Coze cannot satisfy the spec-declared
-bearer scheme (see step 3). Practical options:
+`IFLOW_OPENAPI_OPERATION_SUFFIX` is an optional cache-buster: when Coze's
+plugin-import cache keys collide with a prior version of the spec, set
+it to a fresh string (e.g. `open3`) and re-import. Default unset =
+canonical operationIds (`iflow_web_search`, `iflow_image_search`,
+`iflow_web_fetch`); recommended starting point.
+
+### Push the auth gate to the tunnel / reverse-proxy layer
+
+`IFLOW_OPENAPI_AUTH_TOKEN` does **not** work for Coze deployments. The
+Coze document deliberately omits the security advertisement (see above),
+but the server-side bearer-gate check still runs on `/openapi.coze.json`
+and on every `/tools/*` route — so if you set the token, every Coze tool
+call will 401. The server logs an explicit startup warning when this
+combination is detected.
+
+Put the auth gate one layer above the server instead:
 
 - A named Cloudflare tunnel with a [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/applications/) policy in front (service token or identity-based).
 - Nginx / Caddy in front of the server that checks a fixed header
   (e.g. `X-Tunnel-Auth: <opaque>`) before proxying to `127.0.0.1:8787`.
 - A managed API gateway that enforces auth before reaching the server.
 
-In all of these the search-openapi server itself stays in open mode.
+In all of these the search-openapi server itself stays in open mode
+(`IFLOW_OPENAPI_AUTH_TOKEN` unset).
 
 ## Programmatic API
 

@@ -149,35 +149,53 @@ not read by `@iflow-ai/search-openapi`.
 
 In priority order:
 
-1. **Inline `200` response `data` schemas in `packages/search-openapi/src/openapi.ts`.**
-   The only thing that made Coze's Agent quote real results was concrete
-   inline `data.*` properties (`results.items.{title,url,snippet}`,
-   `images.items.{title,imageUrl,sourceUrl}`, `web_fetch.data.{url,title,content,fromCache}`).
-   Describing them once at the source means Open WebUI, Coze, and any future
-   host get the same parseability without per-host overlays. Highest-value,
-   smallest-blast-radius change. Existing field names are authoritative —
-   take them from the live server, not from the README.
-2. **Add `IFLOW_OPENAPI_PUBLIC_URL` env var** to inject `servers[0].url`.
-   Today the spec emits no `servers` and every host falls back to its own
-   heuristics — Coze needs an explicit URL because import-side and
-   execute-side run in different network contexts. Trivial wiring in
-   `packages/search-openapi/src/{config.ts,bin.ts,openapi.ts}` plus
-   validation matching the existing URL-shape rules.
-3. **Consider OpenAPI `3.0.3` as the default** (or a `IFLOW_OPENAPI_VERSION`
-   opt-in to 3.1). 3.0.3 is what every commercial agent platform parses
-   cleanly today (Coze, Dify, several internal "Bot" frameworks); 3.1's
-   nullable-via-`type:[…,"null"]`, `examples` array, and `const` are the
-   shapes that trip importers. The downgrade walker used during the smoke
-   covers the three known incompatibilities.
-4. **Document the Coze AuthenticationFunc limitation in `packages/search-openapi/README.md`.**
-   Operators targeting Coze should run open mode behind an auth-enforcing
-   proxy (or a tunnel that requires its own auth), not via
-   `IFLOW_OPENAPI_AUTH_TOKEN`, until Coze's plugin runtime accepts a plain
-   `BearerAuth` securityScheme. Documentation only — no code change.
+1. **Inline `200` response `data` schemas in `packages/search-openapi/src/openapi.ts`** — ✅ **landed in unreleased pre.2 source.**
+   `openapi.ts` now emits concrete `data.*` properties for all three tools
+   (`results.items.{title,url,snippet,position,date}`,
+   `images.items.{imageUrl,title,sourceUrl,width,height,position}`,
+   `web_fetch.data.{url,title,content,fromCache,tookMs}`) in both the
+   canonical 3.1 document and the new Coze-flavored 3.0.3 document. Strictly
+   additive for Open WebUI; unblocks Coze's Agent renderer from collapsing
+   `data` to `{0}`. Locked down by `packages/search-openapi/test/openapi.test.ts`
+   under the "concrete inline 200 data schemas" block.
+2. **Add `IFLOW_OPENAPI_PUBLIC_URL` env var** to inject `servers[0].url` — ✅ **landed in unreleased pre.2 source.**
+   Validated against the same URL-shape rules as `IFLOW_OPENAPI_CORS_ORIGIN`
+   (minus the `*` wildcard). Applied to both `/openapi.json` and
+   `/openapi.coze.json` when set. Companion env var
+   `IFLOW_OPENAPI_OPERATION_SUFFIX` (`[a-z0-9_-]{1,32}`) is also new —
+   appends `_<suffix>` to every operationId for cache-busting without
+   touching URL paths.
+3. **Two-flavor OpenAPI: keep `/openapi.json` on 3.1, add `/openapi.coze.json` on 3.0.3** — ✅ **landed in unreleased pre.2 source** (chosen over a default-version flip).
+   `buildOpenApiDocument({ profile: "canonical" | "coze" })` drives both
+   from the same handler list. The Coze flavor downgrades to 3.0.3 and
+   never declares `BearerAuth` (component or per-operation) regardless of
+   `IFLOW_OPENAPI_AUTH_TOKEN`. Open WebUI keeps consuming the canonical
+   3.1 document unchanged — locked down by the "Open WebUI contract"
+   block in `packages/search-openapi/test/openapi.test.ts`.
+4. **Document the Coze AuthenticationFunc limitation in `packages/search-openapi/README.md`** — ✅ **rewritten in unreleased pre.2 source.**
+   README now points Coze users at `/openapi.coze.json`, explains the
+   `IFLOW_OPENAPI_AUTH_TOKEN` footgun (server-side gate still runs, even
+   though the Coze document omits the advertisement), and recommends
+   pushing auth to the tunnel / reverse-proxy layer. `bin.ts` also emits
+   a startup stderr warning whenever `IFLOW_OPENAPI_AUTH_TOKEN` is set,
+   so operators catch the mismatch before deploying to Coze.
 
-(2) and (1) together would let Coze import the canonical `/openapi.json`
-directly with no overlay. (3) reaches a wider set of hosts beyond Coze.
-(4) lowers the support cost in the meantime.
+### Real-platform re-smoke for pre.2 — pending user approval
+
+The four items above are landed in source and covered by offline tests.
+**Real-platform re-smokes against Open WebUI and Coze have not been
+re-run against the pre.2 source** — that requires a fresh `next` publish
+and an operator-supervised end-to-end run (tunnel up, Open WebUI / Coze
+import, real `IFLOW_API_KEY` in the server's env). When that re-smoke
+happens, the expected delta vs. the pre.1 results above is:
+
+- **Open WebUI**: no behavior change. Canonical `/openapi.json` keeps the
+  same paths, operationIds, OAS version, request schemas, and 200/400/401/default
+  response slots. The new inline `data` schemas are strictly additive.
+- **Coze**: the v3 raw overlay step should no longer be needed. Importing
+  `/openapi.coze.json` directly should produce the same green Debug +
+  Agent run that the pre.1 overlay produced, because the document the
+  server emits now matches the overlay shape verified against pre.1.
 
 ## See also
 
