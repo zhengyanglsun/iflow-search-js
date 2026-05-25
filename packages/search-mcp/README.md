@@ -180,6 +180,72 @@ stdio is the supported transport here. OpenCode also supports remote
 MCP (`type: "remote"` with `url`), but this package only ships a stdio
 binary — no SSE / streamable-HTTP recommendation applies.
 
+### CrewAI
+
+[CrewAI](https://docs.crewai.com/) is a Python multi-agent framework.
+It consumes MCP servers through the `MCPServerAdapter` class shipped in
+`crewai-tools[mcp]`, which spawns the stdio child and exposes each MCP
+tool as a `CrewAIMCPTool` your Agents can call.
+
+This path uses the **existing published `@iflow-ai/search-mcp` stdio
+MCP server**:
+
+- No new npm package is required.
+- No CrewAI-native Python package is required — `crewai-tools[mcp]`
+  already bridges any MCP stdio server, including this one.
+- Keep `IFLOW_API_KEY` in the **parent shell env**, not hard-coded in
+  Python source. `StdioServerParameters.env` accepts a dict that is
+  passed to the MCP child as its `process.env`; spreading
+  `os.environ` into it is sufficient to forward the key without ever
+  writing it to a tracked file.
+
+Install (`crewai-tools` requires Python 3.10–3.13):
+
+```bash
+pip install "crewai-tools[mcp]"
+```
+
+Minimal usage:
+
+```python
+import os
+from crewai_tools import MCPServerAdapter
+from mcp import StdioServerParameters
+
+server_params = StdioServerParameters(
+    command="npx",
+    args=["-y", "@iflow-ai/search-mcp@next"],
+    env={**os.environ, "IFLOW_MCP_CLIENT": "crewai"},
+)
+
+with MCPServerAdapter(server_params) as tools:
+    print([tool.name for tool in tools])
+    # → ['iflow_web_search', 'iflow_image_search', 'iflow_web_fetch']
+    # tools can be passed to CrewAI Agents (agent=Agent(tools=tools, ...))
+    # or invoked directly in smoke tests via tool.run(**kwargs)
+```
+
+CrewAI does **not** prefix MCP tool names with the server slug — the
+three names listed by `MCPServerAdapter` are the raw MCP names emitted
+by this package: `iflow_web_search`, `iflow_image_search`,
+`iflow_web_fetch`. A model-driven Crew sees them under those same
+names.
+
+`IFLOW_MCP_CLIENT="crewai"` is accepted by the existing
+`[a-z0-9._-]{1,64}` validation in
+`packages/search-mcp/src/config.ts` — no code change is required to
+add CrewAI as a host slug.
+
+> **Tested scope.** The recorded CrewAI smoke verified
+> `MCPServerAdapter` tool discovery (`tools/list` returned all three
+> expected tools) and direct `CrewAIMCPTool.run(**kwargs)` calls
+> against the real iFlow API. The full CrewAI `Agent` / `Task` /
+> `Crew` LLM-driven tool-selection loop was **not** exercised — it
+> requires an authenticated LLM provider, which is outside this
+> package's wire path. See
+> [`docs/platform-smokes-mcp.md`](../../docs/platform-smokes-mcp.md)
+> for the smoke detail.
+
 After your client restarts, the three tools appear automatically:
 
 | Tool | What it does |
@@ -198,7 +264,7 @@ block of the MCP client config above.
 | `IFLOW_API_KEY` | yes | — | Bearer token sent to iFlow as `Authorization: Bearer ...`. |
 | `IFLOW_BASE_URL` | no | `https://platform.iflow.cn` | Override for testing / private deployments. |
 | `IFLOW_TIMEOUT_MS` | no | `30000` | Per-request timeout. Must be a positive integer if set. |
-| `IFLOW_MCP_CLIENT` | no | — | Declared MCP host name (e.g. `hermes`, `claude-code`, `claude-desktop`, `opencode`). When set, emitted as the `IFlow-MCP-Client` header so backend analytics can distinguish hosts. Allowed: `[a-z0-9._-]{1,64}`. Absent = no header sent (we never send a placeholder like `unknown`). |
+| `IFLOW_MCP_CLIENT` | no | — | Declared MCP host name (e.g. `hermes`, `claude-code`, `claude-desktop`, `opencode`, `crewai`). When set, emitted as the `IFlow-MCP-Client` header so backend analytics can distinguish hosts. Allowed: `[a-z0-9._-]{1,64}`. Absent = no header sent (we never send a placeholder like `unknown`). |
 | `IFLOW_MCP_CLIENT_VERSION` | no | — | Optional version for the above host. When both are set, emitted as `IFlow-MCP-Client-Version`. Allowed: `[A-Za-z0-9._+-]{1,64}`. Ignored unless `IFLOW_MCP_CLIENT` is set. |
 
 A missing or invalid configuration is a fatal init error: the process
