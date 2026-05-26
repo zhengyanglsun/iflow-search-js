@@ -7,7 +7,13 @@ Built on [`@iflow-ai/search-core`](../search-core). Same three tools as
 so prompts that drive an iFlow-search-tool agent under LangChain keep working
 verbatim under MCP.
 
-## Status — MVP (`0.1.0-pre.0`)
+## Status — MVP prerelease
+
+Current `@next`: `0.1.0-pre.2`. Stable `0.1.0` pending release cut — until
+then, install with `@next` (see commands below) or pin to a concrete
+prerelease version. Bare `npm install @iflow-ai/search-mcp` currently
+resolves to `0.1.0-pre.0` (the first-publish `latest` pointer) — prefer
+`@next` for now.
 
 - **Transport:** stdio only. No SSE, no streamable HTTP, no WebSocket in this
   release.
@@ -121,9 +127,11 @@ Notes:
   `IFlow-MCP-Client: hermes` header so backend analytics can distinguish
   Hermes traffic from Claude Code / Claude Desktop. The field is optional
   but recommended.
-- Prefer `@next` (as above) or a pinned version like
-  `@iflow-ai/search-mcp@0.1.0-pre.0`. Avoid the bare `@iflow-ai/search-mcp`
-  in shared configs so upgrades stay intentional.
+- Prefer `@next` (as above) or pin to the concrete version your registry
+  index advertises (e.g. `@iflow-ai/search-mcp@0.1.0-pre.2` at time of
+  writing — run `npm view @iflow-ai/search-mcp@next version` to read the
+  current one). Avoid the bare `@iflow-ai/search-mcp` in shared configs
+  until stable `0.1.0` lands, so upgrades stay intentional.
 - stdio only: Hermes runs the binary as a child process and speaks
   JSON-RPC over stdin/stdout. No `url` / `headers` fields are needed.
 
@@ -305,10 +313,10 @@ const client = createIFlowSearchClient({
   apiKey: process.env.IFLOW_API_KEY!,
   source: "mcp",
   integrationName: "@iflow-ai/search-mcp",
-  integrationVersion: "0.1.0-pre.0",
+  integrationVersion: "0.1.0-pre.2",
 });
 
-const server = buildServer({ client, integrationVersion: "0.1.0-pre.0" });
+const server = buildServer({ client, integrationVersion: "0.1.0-pre.2" });
 // connect `server` to any Transport from @modelcontextprotocol/sdk
 ```
 

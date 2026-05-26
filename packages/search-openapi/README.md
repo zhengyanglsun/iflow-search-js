@@ -8,7 +8,13 @@ Built on [`@iflow-ai/search-core`](../search-core). Same three tools as
 attribution — so prompts that drive an iFlow-search-tool agent under one
 runtime keep working verbatim under another.
 
-## Status — MVP (`0.1.0-pre.0`)
+## Status — MVP prerelease
+
+Current `@next`: `0.1.0-pre.2`. Stable `0.1.0` pending release cut — until
+then, install with `@next` (see commands below) or pin to a concrete
+prerelease version. Bare `npm install @iflow-ai/search-openapi` currently
+resolves to `0.1.0-pre.0` (the first-publish `latest` pointer) — prefer
+`@next` for now.
 
 - **Transport:** HTTP only. Plain JSON request / response. No SSE, no
   WebSocket. The MVP uses Node's built-in `http` module — no Express,
@@ -292,7 +298,7 @@ const client = createIFlowSearchClient({
   apiKey: process.env.IFLOW_API_KEY!,
   source: "openapi",
   integrationName: "@iflow-ai/search-openapi",
-  integrationVersion: "0.1.0-pre.0",
+  integrationVersion: "0.1.0-pre.2",
 });
 
 const app = createApp({ client, authToken: process.env.IFLOW_OPENAPI_AUTH_TOKEN });

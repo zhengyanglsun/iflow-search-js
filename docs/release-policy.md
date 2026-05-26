@@ -4,10 +4,16 @@ How we version and publish packages in this monorepo. Read together with [`packa
 
 ## Currently published
 
-- `@iflow-ai/search-core@0.1.0-pre.0` on dist-tag `next`
-- `@iflow-ai/search-langchain@0.1.0-pre.0` on dist-tag `next` — its `dependencies` pin `@iflow-ai/search-core` to the same `0.1.0-pre.0` (the `workspace:*` protocol is rewritten at pack time)
+| Package | `latest` | `next` | Notes |
+|---|---|---|---|
+| `@iflow-ai/search-core` | `0.1.0-pre.0` | `0.1.0-pre.1` | Zero runtime deps. Adapters' `workspace:*` is rewritten at pack time to whichever version is in `packages/search-core/package.json` at that moment. |
+| `@iflow-ai/search-mcp` | `0.1.0-pre.0` | `0.1.0-pre.2` | Pins `@iflow-ai/search-core` to the rewritten concrete version. Registry entry `io.github.zhengyanglsun/iflow-search` tracks `0.1.0-pre.2`. |
+| `@iflow-ai/search-openapi` | `0.1.0-pre.0` | `0.1.0-pre.2` | Pins `@iflow-ai/search-core` to the rewritten concrete version. |
+| `@iflow-ai/search-langchain` | `0.1.0-pre.0` | `0.1.0-pre.0` | Pins `@iflow-ai/search-core` to the rewritten concrete version. Has not been re-cut on `@next` since first publish. |
 
-Nothing is on the `latest` dist-tag yet. `npm install @iflow-ai/search-core` (without `@next`) will fail until we explicitly promote a version to `latest` — that is intentional.
+Every `latest` pointer above is the **first-publish auto-assignment** — npm sets `latest` on a brand-new scoped package even when you publish only with `--tag next`. We have not deliberately moved any of them. Run `npm view @iflow-ai/<pkg> dist-tags --json` to read live state; this table is a snapshot, not the source of truth.
+
+For installs, **prefer `@next`** until the stable `0.1.0` cutover lands. Bare `npm install @iflow-ai/<pkg>` currently resolves to whatever first-publish version happens to sit on `latest` (always `0.1.0-pre.0` for these four packages), not the most recent prerelease. Do **not** attempt `npm dist-tag rm @iflow-ai/<pkg> latest` to "fix" this — npm returns `E400` for scoped packages whose only versions are prereleases, and the operation will be rejected.
 
 ## Versioning rules
 
@@ -15,20 +21,20 @@ Nothing is on the `latest` dist-tag yet. `npm install @iflow-ai/search-core` (wi
 2. **Stable versions ship on `latest`.** A version with no prerelease identifier (e.g. `0.1.0`, `0.2.0`, `1.0.0`) publishes to `latest`. Default `npm install` picks it up.
 3. **Never promote a `pre` version to `latest`.** The promotion is a fresh release (`0.1.0-pre.5` → `0.1.0`), not an `npm dist-tag add` from a prerelease.
 4. **Docs / examples-only changes do not bump versions.** If a commit only touches `README.md`, `docs/`, `examples/`, or `CONTRIBUTING.md`, no npm publish.
-5. **`search-core` API or behavior change** → publish `search-core`, then assess whether `search-langchain`'s tool surface or attribution headers also need a release. If the adapter is unaffected, only `search-core` ships.
-6. **`search-langchain` tool schema / name / behavior change** → publish `search-langchain` only. Bump the `@iflow-ai/search-core` dependency range if and only if the change requires a newer core.
-7. **`search-core` must publish before `search-langchain`.** `search-langchain`'s manifest pins `@iflow-ai/search-core` to a concrete version; the registry must already serve that version when `search-langchain` is installed.
+5. **`search-core` API or behavior change** → publish `search-core`, then assess each adapter (`search-mcp`, `search-openapi`, `search-langchain`) for whether its tool surface or attribution headers also need a release. Adapters that are unaffected do not ship.
+6. **Adapter-only change** (`search-mcp` / `search-openapi` / `search-langchain` tool schema / name / behavior) → publish that adapter only. Bump the `@iflow-ai/search-core` dependency range if and only if the change requires a newer core.
+7. **`search-core` must publish before any adapter that bumps its core dep.** Every adapter manifest pins `@iflow-ai/search-core` to a concrete version (the `workspace:*` protocol is rewritten at pack time); the registry must already serve that version when the adapter is installed.
 
 ## Per-package release sequencing
 
-For releases that touch both packages:
+For releases that touch `search-core` plus one or more adapters:
 
 1. Bump `search-core` version, publish it.
 2. Wait for the registry to surface the new version (`npm view @iflow-ai/search-core version` returns the new value).
-3. Bump `search-langchain` version. Its `dependencies."@iflow-ai/search-core"` is `workspace:*` in source — pnpm rewrites that at pack time to the version recorded in `packages/search-core/package.json`, so the dependency just needs to match.
-4. Publish `search-langchain`.
+3. Bump each adapter whose source changed. Its `dependencies."@iflow-ai/search-core"` is `workspace:*` in source — pnpm rewrites that at pack time to the version recorded in `packages/search-core/package.json`, so the dependency just needs to match.
+4. Publish the adapters. Order among `search-mcp` / `search-openapi` / `search-langchain` is maintainer preference — they do not depend on each other.
 
-If you only changed `search-langchain`, skip steps 1–2; just bump and publish step 4.
+If you only changed one adapter, skip steps 1–2; just bump and publish step 4 for that adapter alone.
 
 ## Pre-publish checklist
 
@@ -42,28 +48,53 @@ Run all of these before any `pnpm publish` (real or dry-run). All must pass; any
 - [ ] `pnpm -r run test` — full unit suite green.
 - [ ] Secret scan over the diff and the working tree finds no real API keys, tokens, or other authorization credentials. The unit suite uses `test-key-redacted` placeholders only.
 - [ ] `pnpm pack` produces a tarball that contains **only** `package/dist/**`, `package/README.md`, `package/LICENSE`, `package/package.json`. No `src/`, no `test/`, no `scripts/`, no `.env`, no `node_modules`.
-- [ ] In the packed `search-langchain` tarball, `package.json` `dependencies."@iflow-ai/search-core"` is the concrete version string (e.g. `"0.1.0-pre.0"`), not `"workspace:*"`. pnpm rewrites this at pack time; verify it.
+- [ ] In each adapter tarball being released (`search-mcp`, `search-openapi`, `search-langchain`), `package.json` `dependencies."@iflow-ai/search-core"` is the concrete version string (e.g. `"0.1.0-pre.2"`), not `"workspace:*"`. pnpm rewrites this at pack time; verify it for every adapter actually being shipped.
 - [ ] `pnpm --filter <pkg> publish --dry-run --access public --tag next` succeeds with no warnings beyond the expected "Skip publishing (dry run)" line.
 
 ## Publish commands (manual, never automated)
 
 These are run by a maintainer from a local checkout. There is **no** GitHub Actions workflow that publishes — `.github/workflows/ci.yml` only builds, typechecks, and tests.
 
-```bash
-# Prerequisite: npm whoami returns a user with publish access to the @iflow-ai scope.
+Prerequisite for both blocks: `npm whoami` returns a user with publish access to the `@iflow-ai` scope.
 
+Prerelease (default for ongoing work — every release on `next`):
+
+```bash
 pnpm --filter @iflow-ai/search-core publish --access public --tag next
+pnpm --filter @iflow-ai/search-mcp publish --access public --tag next
+pnpm --filter @iflow-ai/search-openapi publish --access public --tag next
 pnpm --filter @iflow-ai/search-langchain publish --access public --tag next
 ```
 
-For a stable `latest` release (when ready, see Phase 5 in the roadmap):
+Skip any package whose source did not change since its current `@next`. `search-core` must publish first when its version bumps; adapter ordering among themselves is maintainer preference.
+
+Stable `latest` release (when ready, see Phase 5 in the roadmap):
 
 ```bash
 pnpm --filter @iflow-ai/search-core publish --access public
+pnpm --filter @iflow-ai/search-mcp publish --access public
+pnpm --filter @iflow-ai/search-openapi publish --access public
 pnpm --filter @iflow-ai/search-langchain publish --access public
 ```
 
-(`--tag latest` is the default; omit the flag.)
+(`--tag latest` is the default; omit the flag.) Same ordering rule — `search-core` first. For the stable `0.1.0` cutover the recommended scope is all four packages together; see the next section.
+
+## Stable `0.1.0` cutover
+
+The promotion from `0.1.0-pre.*` on `next` to stable `0.1.0` on `latest`. Recommended scope: all four public packages together — `search-core`, `search-mcp`, `search-openapi`, `search-langchain`. Splitting the cutover keeps mixed-version installs alive (e.g. stable adapter resolving a prerelease `search-core`) for no real benefit, since core is a transitive dep of every adapter.
+
+Six steps, in order. Each one is its own commit / action; do not collapse them.
+
+1. **Docs-prep commit.** Refresh this file, the per-package READMEs that quote a current pin, and `docs/integration-roadmap.md`. **No version bumps in this commit.** Lands on `main` before any release commit so that downstream docs already describe the upcoming cut. Commit message style: `docs(release): refresh release-policy and README pins before stable 0.1.0`.
+2. **Release commit.** Bumps exactly five tracked files: the four `packages/*/package.json` from `0.1.0-pre.*` to `0.1.0`, plus `packages/search-mcp/server.json` (both `version` and `packages[0].version` to `0.1.0`). No other source change in the same commit. `pnpm-lock.yaml` does not need to move — the only edits are version strings. Commit message style: `chore(release): @iflow-ai/* 0.1.0`. Push to `main` after the full pre-publish gate above passes.
+3. **npm publish in order.** `search-core` first — every adapter pins it to a concrete version through the `workspace:*` rewrite, so the registry must already serve `0.1.0` before any adapter ships. Then the three adapters in any order. Stable publish: no `--tag` flag (default `latest`). After each, `npm view @iflow-ai/<pkg>@latest version` must surface `0.1.0` before moving on.
+4. **MCP Registry republish.** Once `npm view @iflow-ai/search-mcp@0.1.0 version` returns `0.1.0`, run `mcp-publisher login github` (if the session token has expired), then `mcp-publisher validate packages/search-mcp/server.json` and `mcp-publisher publish packages/search-mcp/server.json`. The validator reads `mcpName` from the live npm tarball at `packages[0].version`; if the npm publish has not yet propagated, the registry publish will fail. No registry-side change is required for `search-core`, `search-openapi`, or `search-langchain`.
+5. **Cold-install smoke from `/tmp`.** In an empty temp directory, `npm install @iflow-ai/search-core @iflow-ai/search-mcp @iflow-ai/search-openapi @iflow-ai/search-langchain` (no `@next`) and verify each tarball resolves to `0.1.0` and `dependencies."@iflow-ai/search-core"` in each adapter's installed `package.json` is the concrete `"0.1.0"`. Optional: end-to-end smoke against a known-good `IFLOW_API_KEY` for at least one tool per adapter — but never write that key into any tracked file.
+6. **Post-release docs commit.** Update the "Currently published" table in this file to the new `latest` row, flip the prerelease banners in `packages/search-mcp/README.md` and `packages/search-openapi/README.md`, and revise `docs/integration-roadmap.md` Phase 5 to reflect the completed cutover. Commit message style: `docs(release): record stable 0.1.0 release`.
+
+External-PR status (Hermes Agent docs PR, LangChain JS docs PR, Open WebUI tool-server registry PR) is **not** a gate. Those are upstream-side and their merge timing is independent of this monorepo's publish.
+
+If anything in steps 3–5 reveals a problem after a tarball has already been published, follow the "When a release goes wrong" rules below — **do not `npm unpublish`**. Bump to `0.1.1` and re-cut.
 
 ## What does **not** go in this repo
 
