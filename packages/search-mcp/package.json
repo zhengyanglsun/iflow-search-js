@@ -1,6 +1,6 @@
 {
   "name": "@iflow-ai/search-mcp",
-  "version": "0.1.0-pre.2",
+  "version": "0.1.0",
   "mcpName": "io.github.zhengyanglsun/iflow-search",
   "description": "MCP (Model Context Protocol) server for the iFlow Search API. Exposes web search, image search, and web fetch to any MCP client (Claude Code, Claude Desktop, Hermes Agent, …). Built on @iflow-ai/search-core.",
   "license": "MIT",

@@ -1,6 +1,6 @@
 {
   "name": "@iflow-ai/search-openapi",
-  "version": "0.1.0-pre.2",
+  "version": "0.1.0",
   "description": "HTTP / OpenAPI tool server for the iFlow Search API. Exposes web search, image search, and web fetch over JSON-over-HTTP for Open WebUI, Coze, and other OpenAPI 3.x tool hosts. Built on @iflow-ai/search-core.",
   "license": "MIT",
   "type": "module",

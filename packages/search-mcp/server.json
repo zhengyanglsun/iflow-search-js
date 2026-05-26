@@ -3,7 +3,7 @@
   "name": "io.github.zhengyanglsun/iflow-search",
   "title": "iFlow Search",
   "description": "MCP server for iFlow Search web search, image search, and URL fetch tools.",
-  "version": "0.1.0-pre.2",
+  "version": "0.1.0",
   "repository": {
     "source": "github",
     "url": "https://github.com/zhengyanglsun/iflow-search-js",
@@ -14,7 +14,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@iflow-ai/search-mcp",
-      "version": "0.1.0-pre.2",
+      "version": "0.1.0",
       "transport": {
         "type": "stdio"
       },

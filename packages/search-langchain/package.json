@@ -1,6 +1,6 @@
 {
   "name": "@iflow-ai/search-langchain",
-  "version": "0.1.0-pre.0",
+  "version": "0.1.0",
   "description": "LangChain JS tool factories for the iFlow Search API (web search, image search, web fetch). Built on @iflow-ai/search-core.",
   "license": "MIT",
   "type": "module",
