@@ -207,6 +207,15 @@ Then in Open WebUI:
 
 ## Coze (custom tool / plugin)
 
+**Verified against the published `@iflow-ai/search-openapi@0.1.0-pre.2`
+tarball.** Operator-driven real-platform smoke (Coze import, Tool
+Debug, Agent invocation) passed end-to-end against `/openapi.coze.json`
+with Authentication set to None, default operationIds, no raw overlay,
+and `IFLOW_OPENAPI_PUBLIC_URL` set to the public tunnel URL Coze dials
+back to. See [`docs/platform-smokes.md`](../../docs/platform-smokes.md)
+for the per-endpoint pass record and the pre.1 → pre.2 failure-mode
+resolution table.
+
 Coze can register an external tool from an OpenAPI 3.x document. **Point
 Coze at `/openapi.coze.json`, not `/openapi.json`.** The Coze-flavored
 document is generated from the same handler list as canonical — same

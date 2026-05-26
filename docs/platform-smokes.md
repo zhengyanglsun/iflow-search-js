@@ -5,9 +5,22 @@ against real third-party agent platforms. Source of truth for what works
 out-of-the-box vs. what requires a host-specific overlay, and which gaps
 should drive the next iteration.
 
-Smoke target: **`@iflow-ai/search-openapi@next` = `0.1.0-pre.1`**
-(re-verify with `npm view @iflow-ai/search-openapi@next version`; the dist-tag
-on `latest` is intentionally still `0.1.0-pre.0` — see [release-policy.md](./release-policy.md)).
+Smoke targets, in chronological order:
+
+- `@iflow-ai/search-openapi@0.1.0-pre.1` — initial real-platform run.
+  Open WebUI passed against canonical `/openapi.json`. Coze passed
+  **only** via a host-specific overlay applied at import time. Recorded
+  below under the pre.1 sections.
+- `@iflow-ai/search-openapi@0.1.0-pre.2` — published re-smoke after the
+  Coze-flavored route landed in source. Open WebUI re-verified at the
+  HTTP layer (browser UI not rerun; canonical contract preserved). Coze
+  passed end-to-end via the published `/openapi.coze.json` — **no
+  host-specific overlay needed**. Recorded below under the pre.2 section.
+
+Re-verify the current `@next` dist-tag with
+`npm view @iflow-ai/search-openapi@next version`. The `latest` dist-tag
+is intentionally still `0.1.0-pre.0` — see
+[release-policy.md](./release-policy.md).
 
 ## Open WebUI — passes against canonical `/openapi.json`
 
@@ -85,6 +98,74 @@ passed against that overlay; the canonical spec did not.
   consumable, not to fork it.
 - Implement `IFLOW_OPENAPI_PUBLIC_URL` mid-smoke. Listed below as a
   recommendation instead.
+
+## Pre.2 published real-platform smoke — passed
+
+Re-smokes against the published `@iflow-ai/search-openapi@0.1.0-pre.2`
+tarball (`@next` at smoke time; `latest` intentionally untouched at
+`0.1.0-pre.0` — see [release-policy.md](./release-policy.md)). This
+section records what changed vs. the pre.1 results above; the pre.1
+sections are kept as historical record of the overlay-driven Coze path
+that pre.2 makes unnecessary.
+
+### Open WebUI — HTTP-level re-smoke against published `@next`
+
+| | |
+|---|---|
+| Tarball | `@iflow-ai/search-openapi@0.1.0-pre.2` via `npx -y @iflow-ai/search-openapi@next` |
+| `GET /health` | ✅ `{ ok: true, version: "0.1.0-pre.2" }` |
+| `GET /openapi.json` | ✅ `openapi: "3.1.0"`, 3 canonical tool paths |
+| `OPTIONS /tools/iflow_web_search` (browser-style preflight with `x-session-id`) | ✅ `204`, `Access-Control-Allow-Headers` includes `X-Session-Id` |
+| `POST iflow_web_search` (real iFlow API, `Origin: http://localhost:3000`) | ✅ |
+| `POST iflow_image_search` (real iFlow API) | ✅ |
+| `POST iflow_web_fetch` (real iFlow API) | ✅ |
+| POST response CORS | ✅ `Access-Control-Allow-Origin: *`, `Vary: Origin`, ACAH includes `X-Session-Id` |
+
+Browser-side Open WebUI UI was **not** re-driven on pre.2. The pre.1 UI
+run above already verified end-to-end behavior against the canonical
+`/openapi.json`, and the pre.2 canonical document preserves that
+contract — same paths, operationIds, OAS version, security shape,
+request schemas, and 200 / 400 / 401 / default response slots. The new
+inline `data.*` properties are strictly additive (Open WebUI ignored
+them on pre.1 too).
+
+### Coze — operator-driven UI smoke against published `@next`
+
+| | |
+|---|---|
+| Endpoint imported into Coze | `<transient cloudflared tunnel URL>/openapi.coze.json` |
+| Coze Authentication | None |
+| `IFLOW_OPENAPI_AUTH_TOKEN` | unset — server in open mode |
+| `IFLOW_OPENAPI_OPERATION_SUFFIX` | unset — default operationIds |
+| `IFLOW_OPENAPI_PUBLIC_URL` | set to the same transient tunnel URL so `servers[0].url` resolves |
+| Coze import | ✅ direct from `/openapi.coze.json` — **no raw overlay paste needed** |
+| Final verified operationIds | `iflow_web_search`, `iflow_image_search`, `iflow_web_fetch` (no `_open3` suffix) |
+| Tool Debug | ✅ operator reported success for all three tools |
+| Agent invocation | ✅ operator reported success for all three tools |
+
+The real `*.trycloudflare.com` host is **redacted on purpose**. Quick
+`cloudflared` tunnels rotate on every process restart and have no
+historical value — re-running this smoke produces a new URL each time.
+
+An earlier exploratory run used `IFLOW_OPENAPI_OPERATION_SUFFIX=open3`
+as a Coze-plugin-cache buster, which produced operationIds
+`iflow_web_search_open3` etc. The **final verified pre.2 Coze run**
+above did **not** use the suffix — Coze imported the default-named
+operationIds directly. `IFLOW_OPENAPI_OPERATION_SUFFIX` remains an
+optional cache-buster (documented in
+`packages/search-openapi/README.md`), not a default for normal Coze
+setup.
+
+### Pre.1 failure modes — resolved by pre.2
+
+| Pre.1 failure | Resolution in pre.2 |
+|---|---|
+| `Invalid params` at Coze import (OAS 3.1.0) | `/openapi.coze.json` advertises `openapi: "3.0.3"` |
+| `security requirements failed: missing AuthenticationFunc` at Coze runtime | `/openapi.coze.json` never declares `security` or `components.securitySchemes`; Coze Auth = None |
+| `no such host` at Coze runtime | `IFLOW_OPENAPI_PUBLIC_URL` injects the public base into `servers[0].url` of `/openapi.coze.json` |
+| Coze Agent renders `data {0}` | Inline `data.*` schemas in every 200 response (canonical and Coze profiles) |
+
+The pre.1 raw-overlay workflow under [Reproduction sketch](#reproduction-sketch) below remains in this doc as historical record only; it is **not** needed for pre.2.
 
 ## Reproduction sketch
 
@@ -180,22 +261,16 @@ In priority order:
    a startup stderr warning whenever `IFLOW_OPENAPI_AUTH_TOKEN` is set,
    so operators catch the mismatch before deploying to Coze.
 
-### Real-platform re-smoke for pre.2 — pending user approval
+### Real-platform re-smoke for pre.2 — passed
 
-The four items above are landed in source and covered by offline tests.
-**Real-platform re-smokes against Open WebUI and Coze have not been
-re-run against the pre.2 source** — that requires a fresh `next` publish
-and an operator-supervised end-to-end run (tunnel up, Open WebUI / Coze
-import, real `IFLOW_API_KEY` in the server's env). When that re-smoke
-happens, the expected delta vs. the pre.1 results above is:
-
-- **Open WebUI**: no behavior change. Canonical `/openapi.json` keeps the
-  same paths, operationIds, OAS version, request schemas, and 200/400/401/default
-  response slots. The new inline `data` schemas are strictly additive.
-- **Coze**: the v3 raw overlay step should no longer be needed. Importing
-  `/openapi.coze.json` directly should produce the same green Debug +
-  Agent run that the pre.1 overlay produced, because the document the
-  server emits now matches the overlay shape verified against pre.1.
+Done — `@iflow-ai/search-openapi@0.1.0-pre.2` is published on `@next`
+and the operator-supervised real-platform smoke ran against the
+published tarball. See [Pre.2 published real-platform smoke — passed](#pre2-published-real-platform-smoke--passed)
+above for the per-endpoint table. Both expected deltas vs. pre.1 held:
+Open WebUI's canonical contract was preserved at the HTTP layer
+(browser UI not rerun), and Coze imported `/openapi.coze.json`
+directly with default operationIds, Authentication = None, and no raw
+overlay.
 
 ## See also
 
