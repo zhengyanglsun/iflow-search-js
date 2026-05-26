@@ -8,13 +8,19 @@ Built on [`@iflow-ai/search-core`](../search-core). Same three tools as
 attribution — so prompts that drive an iFlow-search-tool agent under one
 runtime keep working verbatim under another.
 
-## Status — MVP prerelease
+## Status — MVP stable (`0.1.0`)
 
-Current `@next`: `0.1.0-pre.2`. Stable `0.1.0` pending release cut — until
-then, install with `@next` (see commands below) or pin to a concrete
-prerelease version. Bare `npm install @iflow-ai/search-openapi` currently
-resolves to `0.1.0-pre.0` (the first-publish `latest` pointer) — prefer
-`@next` for now.
+`@iflow-ai/search-openapi@0.1.0` is live on dist-tag `latest`. Bare
+`npm install @iflow-ai/search-openapi` (or `npx -y @iflow-ai/search-openapi`)
+resolves the stable release. `@next` remains the prerelease channel and
+currently points at `0.1.0-pre.2`; use it only when you need to track an
+upcoming pre-cut. Run
+`npm view @iflow-ai/search-openapi dist-tags --json` to read live state.
+
+The `/openapi.coze.json` shape, route surface, response schemas, and
+attribution headers are identical between `0.1.0-pre.2` and `0.1.0` — no
+re-import is required for existing Coze / Open WebUI deployments that
+were on `pre.2`.
 
 - **Transport:** HTTP only. Plain JSON request / response. No SSE, no
   WebSocket. The MVP uses Node's built-in `http` module — no Express,
@@ -33,9 +39,10 @@ resolves to `0.1.0-pre.0` (the first-publish `latest` pointer) — prefer
 ## Install & run
 
 ```bash
-# One-shot, no install — pulls the published @next tag:
+# One-shot, no install — pulls the current stable from dist-tag `latest`:
 IFLOW_API_KEY=YOUR_IFLOW_API_KEY \
-  npx -y @iflow-ai/search-openapi@next
+  npx -y @iflow-ai/search-openapi
+# Append @next to track the prerelease channel instead.
 ```
 
 Or pin it as a dependency:
@@ -298,7 +305,7 @@ const client = createIFlowSearchClient({
   apiKey: process.env.IFLOW_API_KEY!,
   source: "openapi",
   integrationName: "@iflow-ai/search-openapi",
-  integrationVersion: "0.1.0-pre.2",
+  integrationVersion: "0.1.0",
 });
 
 const app = createApp({ client, authToken: process.env.IFLOW_OPENAPI_AUTH_TOKEN });

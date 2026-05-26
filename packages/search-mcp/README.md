@@ -7,13 +7,19 @@ Built on [`@iflow-ai/search-core`](../search-core). Same three tools as
 so prompts that drive an iFlow-search-tool agent under LangChain keep working
 verbatim under MCP.
 
-## Status — MVP prerelease
+## Status — MVP stable (`0.1.0`)
 
-Current `@next`: `0.1.0-pre.2`. Stable `0.1.0` pending release cut — until
-then, install with `@next` (see commands below) or pin to a concrete
-prerelease version. Bare `npm install @iflow-ai/search-mcp` currently
-resolves to `0.1.0-pre.0` (the first-publish `latest` pointer) — prefer
-`@next` for now.
+`@iflow-ai/search-mcp@0.1.0` is live on dist-tag `latest`. Bare
+`npm install @iflow-ai/search-mcp` resolves the stable release. `@next`
+remains the prerelease channel and currently points at `0.1.0-pre.2`; use
+it only when you need to track an upcoming pre-cut. Run
+`npm view @iflow-ai/search-mcp dist-tags --json` to read live state.
+
+The Official MCP Registry entry `io.github.zhengyanglsun/iflow-search`
+still tracks `0.1.0-pre.2` — the stable `0.1.0` republish is a separate
+maintainer step (see [Official MCP Registry](#official-mcp-registry) below).
+Installing from npm gets you `0.1.0` regardless; the registry is
+metadata-only.
 
 - **Transport:** stdio only. No SSE, no streamable HTTP, no WebSocket in this
   release.
@@ -37,10 +43,11 @@ Node ≥ 18.
 This server is listed in the [Official MCP Registry](https://registry.modelcontextprotocol.io):
 
 - **Registry name:** `io.github.zhengyanglsun/iflow-search`
-- **npm package:** `@iflow-ai/search-mcp` on dist-tag `next`
+- **npm package:** `@iflow-ai/search-mcp` on dist-tag `latest` (`0.1.0`)
+- **Registry-tracked version:** `0.1.0-pre.2` — stable `0.1.0` republish to the registry is pending; npm is the source of truth for what installs.
 - **Transport:** `stdio`
 
-The registry stores metadata only — the package itself still installs from npm. MCP clients launch the server with `npx -y @iflow-ai/search-mcp@next`, which is the same command shown in the [Use it from an MCP client](#use-it-from-an-mcp-client) sections below.
+The registry stores metadata only — the package itself still installs from npm. MCP clients launch the server with `npx -y @iflow-ai/search-mcp`, which resolves the current stable release (`0.1.0`), or pin a concrete version (e.g. `@iflow-ai/search-mcp@0.1.0`) for reproducibility. `@next` is still available for pre-cut testing.
 
 ## Use it from an MCP client
 
@@ -127,11 +134,13 @@ Notes:
   `IFlow-MCP-Client: hermes` header so backend analytics can distinguish
   Hermes traffic from Claude Code / Claude Desktop. The field is optional
   but recommended.
-- Prefer `@next` (as above) or pin to the concrete version your registry
-  index advertises (e.g. `@iflow-ai/search-mcp@0.1.0-pre.2` at time of
-  writing — run `npm view @iflow-ai/search-mcp@next version` to read the
-  current one). Avoid the bare `@iflow-ai/search-mcp` in shared configs
-  until stable `0.1.0` lands, so upgrades stay intentional.
+- Stable `0.1.0` is on dist-tag `latest`; the bare
+  `@iflow-ai/search-mcp` shown above resolves it. Pin to the concrete
+  version your registry index advertises (e.g.
+  `@iflow-ai/search-mcp@0.1.0`) when you want deterministic upgrades —
+  run `npm view @iflow-ai/search-mcp dist-tags --json` to read the
+  current state. `@next` (`0.1.0-pre.2` at time of writing) is still
+  published for pre-cut testing.
 - stdio only: Hermes runs the binary as a child process and speaks
   JSON-RPC over stdin/stdout. No `url` / `headers` fields are needed.
 
@@ -313,10 +322,10 @@ const client = createIFlowSearchClient({
   apiKey: process.env.IFLOW_API_KEY!,
   source: "mcp",
   integrationName: "@iflow-ai/search-mcp",
-  integrationVersion: "0.1.0-pre.2",
+  integrationVersion: "0.1.0",
 });
 
-const server = buildServer({ client, integrationVersion: "0.1.0-pre.2" });
+const server = buildServer({ client, integrationVersion: "0.1.0" });
 // connect `server` to any Transport from @modelcontextprotocol/sdk
 ```
 

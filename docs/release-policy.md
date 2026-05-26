@@ -6,14 +6,14 @@ How we version and publish packages in this monorepo. Read together with [`packa
 
 | Package | `latest` | `next` | Notes |
 |---|---|---|---|
-| `@iflow-ai/search-core` | `0.1.0-pre.0` | `0.1.0-pre.1` | Zero runtime deps. Adapters' `workspace:*` is rewritten at pack time to whichever version is in `packages/search-core/package.json` at that moment. |
-| `@iflow-ai/search-mcp` | `0.1.0-pre.0` | `0.1.0-pre.2` | Pins `@iflow-ai/search-core` to the rewritten concrete version. Registry entry `io.github.zhengyanglsun/iflow-search` tracks `0.1.0-pre.2`. |
-| `@iflow-ai/search-openapi` | `0.1.0-pre.0` | `0.1.0-pre.2` | Pins `@iflow-ai/search-core` to the rewritten concrete version. |
-| `@iflow-ai/search-langchain` | `0.1.0-pre.0` | `0.1.0-pre.0` | Pins `@iflow-ai/search-core` to the rewritten concrete version. Has not been re-cut on `@next` since first publish. |
+| `@iflow-ai/search-core` | `0.1.0` | `0.1.0-pre.1` | Zero runtime deps. Adapters' `workspace:*` is rewritten at pack time to whichever version is in `packages/search-core/package.json` at that moment. |
+| `@iflow-ai/search-mcp` | `0.1.0` | `0.1.0-pre.2` | Pins `@iflow-ai/search-core` to the rewritten concrete version. Registry entry `io.github.zhengyanglsun/iflow-search` still tracks `0.1.0-pre.2`; stable `0.1.0` registry republish via `mcp-publisher publish` is the remaining follow-up from the cutover. |
+| `@iflow-ai/search-openapi` | `0.1.0` | `0.1.0-pre.2` | Pins `@iflow-ai/search-core` to the rewritten concrete version. |
+| `@iflow-ai/search-langchain` | `0.1.0` | `0.1.0-pre.0` | Pins `@iflow-ai/search-core` to the rewritten concrete version. `@next` was never re-cut after the first publish, so `next` deliberately sits behind `latest`. |
 
-Every `latest` pointer above is the **first-publish auto-assignment** — npm sets `latest` on a brand-new scoped package even when you publish only with `--tag next`. We have not deliberately moved any of them. Run `npm view @iflow-ai/<pkg> dist-tags --json` to read live state; this table is a snapshot, not the source of truth.
+Stable `0.1.0` shipped for all four packages on dist-tag `latest`; bare `npm install @iflow-ai/<pkg>` now resolves the stable release. `next` is left pointing at each package's most recent prerelease for traceability — do **not** retract or move it without an explicit prerelease decision. Run `npm view @iflow-ai/<pkg> dist-tags --json` to read live state; this table is a snapshot, not the source of truth.
 
-For installs, **prefer `@next`** until the stable `0.1.0` cutover lands. Bare `npm install @iflow-ai/<pkg>` currently resolves to whatever first-publish version happens to sit on `latest` (always `0.1.0-pre.0` for these four packages), not the most recent prerelease. Do **not** attempt `npm dist-tag rm @iflow-ai/<pkg> latest` to "fix" this — npm returns `E400` for scoped packages whose only versions are prereleases, and the operation will be rejected.
+Do **not** attempt `npm dist-tag rm @iflow-ai/<pkg> latest` — npm returns `E400` for scoped packages, and the operation is rejected regardless. Stable promotion is always a fresh publish (no version, no prerelease identifier) that npm assigns to `latest` automatically.
 
 ## Versioning rules
 
