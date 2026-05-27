@@ -284,6 +284,55 @@ add CrewAI as a host slug.
 > [`docs/platform-smokes-mcp.md`](../../docs/platform-smokes-mcp.md)
 > for the smoke detail.
 
+### Cline (VS Code extension)
+
+[Cline](https://cline.bot/) is a VS Code coding agent with built-in
+stdio MCP support. It reads MCP server definitions from
+`~/.cline/mcp.json` (macOS/Linux; equivalent per-user path on Windows).
+
+Add an `iflow-search` entry pointing at the stable package — `npx -y`
+resolves the current `latest` release without a global install:
+
+```json
+{
+  "mcpServers": {
+    "iflow-search": {
+      "command": "npx",
+      "args": ["-y", "@iflow-ai/search-mcp"],
+      "env": {
+        "IFLOW_API_KEY": "YOUR_IFLOW_API_KEY",
+        "IFLOW_MCP_CLIENT": "cline"
+      },
+      "autoApprove": []
+    }
+  }
+}
+```
+
+After Cline reloads its MCP config, the three tools —
+`iflow_web_search`, `iflow_image_search`, `iflow_web_fetch` — show up
+in the agent's tool list. The same server is discoverable in the
+[Official MCP Registry](https://registry.modelcontextprotocol.io) as
+`io.github.zhengyanglsun/iflow-search`; Cline still installs the
+package directly from npm.
+
+`IFLOW_MCP_CLIENT: cline` is accepted by the existing
+`[a-z0-9._-]{1,64}` validation in
+`packages/search-mcp/src/config.ts` — no code change is required to
+add Cline as a host slug.
+
+> **Do not commit or share `~/.cline/mcp.json`.** If Cline can inject
+> `IFLOW_API_KEY` from your parent shell or a local secret manager,
+> prefer that over hard-coding the literal value into the config file.
+> Treat any shared copy of `mcp.json` as if the key inside it were
+> already leaked. `@iflow-ai/search-mcp` never reads from disk and will
+> not pick up a stray `.env`, so the only place the key needs to live
+> is the `env` block Cline forwards to the child process.
+>
+> `autoApprove: []` (the default shown above) keeps every tool call
+> gated behind Cline's approval UI — leave it that way until you have
+> verified the wiring end-to-end with a known-safe query.
+
 After your client restarts, the three tools appear automatically:
 
 | Tool | What it does |
