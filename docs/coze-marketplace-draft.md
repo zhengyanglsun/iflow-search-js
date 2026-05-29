@@ -1,10 +1,11 @@
 # Coze Marketplace Submission — Draft
 
 **Status:** Draft / not submitted. Public marketplace is **not** ready —
-host, auth layer, rate-limit policy, and Privacy/Terms public URLs are
-still pending operator action. The private/workspace smoke that passed
-on 2026-05-26 via a transient cloudflared tunnel is **not** a marketplace
-approval and must not be cited as such.
+host, auth layer, and rate-limit policy are still pending operator
+action. Privacy/Terms public URLs are live and verified on 2026-05-29
+(see [GitHub Pages note](#github-pages-note)). The private/workspace
+smoke that passed on 2026-05-26 via a transient cloudflared tunnel is
+**not** a marketplace approval and must not be cited as such.
 
 **Last updated:** 2026-05-29
 **Operator:** zhengyanglsun
@@ -133,8 +134,8 @@ the following are finalized.**
 - [ ] Logo 400×400 PNG ready (operator-side asset)
 - [ ] Long description EN + ZH reviewed (this draft)
 - [ ] Three tool ZH overrides reviewed (this draft)
-- [ ] Privacy policy live at a stable URL (see [GitHub Pages note](#github-pages-note))
-- [ ] Terms of service live at a stable URL (see [GitHub Pages note](#github-pages-note))
+- [x] Privacy policy live at a stable URL — verified 2026-05-29 (see [GitHub Pages note](#github-pages-note))
+- [x] Terms of service live at a stable URL — verified 2026-05-29 (see [GitHub Pages note](#github-pages-note))
 - [ ] Contact email confirmed: `2039222749@qq.com`
 - [ ] Operator name confirmed: `zhengyanglsun`
 - [ ] Production host provisioned (stable domain + TLS)
@@ -147,15 +148,24 @@ the following are finalized.**
 
 ## GitHub Pages note
 
-Expected public URLs once Pages is enabled and the legal files are
-committed (these need to be verified after Pages is actually enabled):
+**Status:** verified 2026-05-29. GitHub Pages is enabled on this repo
+with source = `main` / `/`, HTTPS enforced. All four legal pages
+return `200 OK` with the expected H1 title rendered.
 
-- `https://zhengyanglsun.github.io/iflow-search-js/legal/privacy-en`
-- `https://zhengyanglsun.github.io/iflow-search-js/legal/privacy-zh`
-- `https://zhengyanglsun.github.io/iflow-search-js/legal/terms-en`
-- `https://zhengyanglsun.github.io/iflow-search-js/legal/terms-zh`
+Canonical URLs to paste into the Coze submission form (no `.html`
+suffix — cleaner and stable; the `.html` variants also return 200 but
+should not be used as the canonical):
 
-**Not yet verified.** GitHub Pages source is not configured in this
-repo at the time of writing. Operator must enable Pages (Settings →
-Pages → Source = `main`, folder = `/`) and confirm the rendered URLs
-before pasting them into the Coze submission form.
+- Privacy Policy (中文): `https://zhengyanglsun.github.io/iflow-search-js/legal/privacy-zh`
+- Privacy Policy (English): `https://zhengyanglsun.github.io/iflow-search-js/legal/privacy-en`
+- Terms of Service (中文): `https://zhengyanglsun.github.io/iflow-search-js/legal/terms-zh`
+- Terms of Service (English): `https://zhengyanglsun.github.io/iflow-search-js/legal/terms-en`
+
+Recommended for the Coze marketplace submission form: use the **中文**
+canonical URLs in the primary Privacy / Terms fields (Coze is a
+Chinese-language platform), and keep the English canonicals as
+operator-side backups if the reviewer asks for an English version.
+
+If either page later starts returning non-200 (Pages outage, repo
+rename, branch protection change, etc.), re-run the eight-URL probe
+before submitting or resubmitting to the marketplace.
