@@ -2,14 +2,103 @@
 
 **Status:** Draft / not submitted. Public marketplace is **not** ready —
 host, auth layer, and rate-limit policy are still pending operator
-action. Privacy/Terms public URLs are live and verified on 2026-05-29
-(see [GitHub Pages note](#github-pages-note)). The private/workspace
-smoke that passed on 2026-05-26 via a transient cloudflared tunnel is
-**not** a marketplace approval and must not be cited as such.
+action, **and** a separate platform-capability gate (public-store BYOK
+feasibility) is currently NO-GO. See
+[Public Store BYOK gating — verified 2026-06-05](#public-store-byok-gating--verified-2026-06-05)
+below before actioning any item in the submission checklist.
+Privacy/Terms public URLs are live and verified on 2026-05-29 (see
+[GitHub Pages note](#github-pages-note)). The private/workspace smoke
+that passed on 2026-05-26 via a transient cloudflared tunnel is
+**not** a marketplace approval and must not be cited as such. The
+recommended distribution path today is the workspace BYOK tutorial in
+[`coze-byok-private-plugin.md`](./coze-byok-private-plugin.md).
 
-**Last updated:** 2026-05-29
+**Last updated:** 2026-06-05
 **Operator:** zhengyanglsun
 **Contact:** 2039222749@qq.com
+
+---
+
+## Public Store BYOK gating — verified 2026-06-05
+
+A read-only investigation on 2026-06-05 (Coze.com EN docs, 扣子.cn ZH
+docs, public store browsing, OAuth-plugin docs, and Coze-Studio wiki
+cross-check) confirmed that **a "real BYOK" public Coze Plugin Store
+listing is not implementable today** for an upstream service whose
+only authentication is a static Bearer API key. Recording the gate
+here so future-self does not redo the research.
+
+### Verified Coze plugin authentication model
+
+Coze's plugin runtime supports exactly three authentication modes
+(both coze.com and 扣子.cn — same surface area):
+
+| Mode | Credential location | Per-user? | Suitable for our case |
+|---|---|---|---|
+| `none` | — | — | No (paid upstream) |
+| `service_http` (Service token / API key) | publisher-side, configured once at plugin creation | No — single value reused for every installer's calls | Only if the publisher accepts the usage and quota-abuse risk |
+| `oauth` (Authorization Code) | per-user, obtained via the upstream's OAuth flow | Yes | Requires the upstream to be a real OAuth provider |
+
+No fourth "installation-time per-user static API-key" mode was found
+in the official docs or in the public Plugin Store UI. `service_http`
+is publisher-side; `oauth` is the only per-user path and requires the
+upstream to expose a real OAuth Authorization endpoint, Token
+endpoint, scope list, and a `client_id` / `client_secret` that Coze
+can use as the relying party (Coze's redirect URI must also be
+whitelistable on the upstream side).
+
+### iFlow upstream constraint
+
+`https://platform.iflow.cn` currently exposes only static
+`Authorization: Bearer <IFLOW_API_KEY>` authentication. There is no
+public OAuth Authorization endpoint, no Token endpoint, no scope
+list, and no third-party OAuth-app / Redirect-URI registration
+surface. The Coze `oauth` plugin form therefore cannot be filled in.
+
+### Consequence — public Plugin Store BYOK is not implementable today
+
+Combining the two constraints:
+
+- We cannot use `oauth` (iFlow does not expose one).
+- We cannot ask each installer to enter their own iFlow key in a
+  Coze install-time form (no such form exists for `service_http`).
+- A `service_http` listing carrying the publisher's key would be
+  reused by every installer's calls; **the publisher would bear all
+  usage and quota-abuse risk on the upstream account.**
+- Routing the API key through a tool input parameter so the agent
+  prompt asks the user for it (a workaround that surfaces in some
+  third-party Coze tutorials) is explicitly out of scope — it would
+  put the secret into model context, tool I/O traces, and
+  conversation logs.
+
+**Public Store status: NO-GO** until at least one of the
+re-evaluation triggers below fires. Until then, distribute via the
+workspace BYOK tutorial in
+[`coze-byok-private-plugin.md`](./coze-byok-private-plugin.md):
+each user creates a private Coze plugin in their own workspace and
+configures their own iFlow key. That route is real BYOK without
+needing any platform feature beyond what already exists.
+
+### Re-evaluation triggers
+
+Re-open this gating decision and re-run the BYOK feasibility check
+when **any** of the following becomes true:
+
+1. **Coze adds individual API-key authorization** — a `service_http`-
+   style mode where each installer provides their own static key at
+   install time, stored per-user by the platform and injected into
+   the configured Authorization header on each call (no model-context
+   exposure).
+2. **iFlow exposes a third-party OAuth 2.0 Authorization Code flow**
+   — public Authorization endpoint, Token endpoint, scopes, and the
+   ability to register Coze's redirect URI as a client. Coze's
+   existing `oauth` plugin form would then become fillable end-to-end.
+3. **iFlow explicitly approves and provides a public-plugin
+   dedicated quota / key** — i.e. allows the operator to publish a
+   `service_http` listing using a key that iFlow has carved out for
+   that purpose, with a documented quota and abuse policy. Without
+   this written approval, a shared-key public listing remains
+   off-table regardless of technical feasibility.
 
 ---
 
@@ -118,7 +207,8 @@ the following are finalized.**
   paths remain gated.
 - **Rate-limit policy:** to be decided. Open-mode without rate limits is
   unacceptable for a public marketplace listing (anyone with the URL
-  could drain the operator's iFlow quota).
+  could create uncontrolled usage and quota-abuse risk for the
+  operator).
 
 ### What "passed" already (do NOT extrapolate)
 
@@ -131,6 +221,12 @@ the following are finalized.**
 
 ## Submission checklist (do not check off prematurely)
 
+> Every item below is **additionally** gated by
+> [Public Store BYOK gating — verified 2026-06-05](#public-store-byok-gating--verified-2026-06-05).
+> Do not action any of these until at least one of the three
+> re-evaluation triggers above has fired.
+
+- [ ] Public Store BYOK gating cleared (one of the three re-evaluation triggers has fired)
 - [ ] Logo 400×400 PNG ready (operator-side asset)
 - [ ] Long description EN + ZH reviewed (this draft)
 - [ ] Three tool ZH overrides reviewed (this draft)

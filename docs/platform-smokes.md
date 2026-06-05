@@ -274,6 +274,8 @@ overlay.
 
 ## See also
 
+- [coze-byok-private-plugin.md](./coze-byok-private-plugin.md) — workspace BYOK tutorial; the recommended Coze distribution path today (direct connect to `https://platform.iflow.cn`, no tunnel)
+- [coze-marketplace-draft.md](./coze-marketplace-draft.md) — public Plugin Store gating record, including the 2026-06-05 BYOK NO-GO and re-evaluation triggers
 - [release-policy.md](./release-policy.md) — versioning rules and the `next` vs `latest` discipline
 - [integration-roadmap.md](./integration-roadmap.md) — adapter priorities, where new platforms fit
 - [mcp-design.md](./mcp-design.md) — sibling rationale for the MCP transport
