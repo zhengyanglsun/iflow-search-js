@@ -1,0 +1,20 @@
+{
+  "name": "iflow-search",
+  "description": "iFlow Search provides web search, image search, and web page fetching through MCP. Three tools: iflow_web_search, iflow_image_search, iflow_web_fetch. Backed by @iflow-ai/search-mcp on npm and the Official MCP Registry entry io.github.zhengyanglsun/iflow-search.",
+  "version": "0.1.0",
+  "author": {
+    "name": "zhengyanglsun"
+  },
+  "homepage": "https://github.com/zhengyanglsun/iflow-search-js/tree/main/plugins/iflow-search",
+  "repository": "https://github.com/zhengyanglsun/iflow-search-js",
+  "license": "MIT",
+  "keywords": [
+    "iflow",
+    "iflow-search",
+    "search",
+    "web-search",
+    "image-search",
+    "web-fetch",
+    "mcp"
+  ]
+}

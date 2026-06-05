@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "iflow-search": {
+      "command": "npx",
+      "args": ["-y", "@iflow-ai/search-mcp@0.1.0"],
+      "env": {
+        "IFLOW_API_KEY": "${IFLOW_API_KEY}",
+        "IFLOW_MCP_CLIENT": "claude-code"
+      }
+    }
+  }
+}

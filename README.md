@@ -21,6 +21,7 @@ This monorepo contains:
 | `packages/search-langchain` | `@iflow-ai/search-langchain` | implemented | npm | `@iflow-ai/search-core`, `@langchain/core`, `zod` | You are building a LangChain JS agent **or** a LangGraph agent — both reuse the same tool factories. |
 | `examples/langgraph-agent` | `@iflow-examples/langgraph-agent` | implemented | **not published** (workspace example) | `@iflow-ai/search-langchain`, `@langchain/langgraph` | Reference for wiring `createReactAgent` with iFlow Search tools. Copy the pattern, don't depend on it. |
 | `packages/search-mcp` | `@iflow-ai/search-mcp` | implemented | npm | `@iflow-ai/search-core`, MCP SDK | You want to expose iFlow Search to MCP clients (Hermes Agent, Claude Code, Claude Desktop, etc.). Stdio transport. |
+| `plugins/iflow-search` | (Claude Code Plugin manifest) | implemented | Anthropic Plugin Directory (pending) | `@iflow-ai/search-mcp` (npm) | You are a Claude Code user and want one-click `/plugin install` of iFlow Search. Metadata-only; reuses the npm package. |
 
 ### Why there is no `@iflow-ai/search-langgraph`
 
@@ -33,6 +34,7 @@ LangGraph consumes LangChain tools directly. A separate `search-langgraph` packa
 - ✅ `examples/langgraph-agent` — implemented, ReAct agent end-to-end smoke validated against real iFlow API
 - ❌ no separate `@iflow-ai/search-langgraph` package (intentional — see above)
 - ✅ `@iflow-ai/search-mcp` — implemented, stdio MCP server with three tools mirroring the LangChain adapter; optional MCP-host attribution via `IFLOW_MCP_CLIENT` / `IFLOW_MCP_CLIENT_VERSION`
+- ✅ `plugins/iflow-search` — Claude Code Plugin manifest (metadata-only, runs `npx -y @iflow-ai/search-mcp`); awaiting submission to the Anthropic Plugin Directory. See [`plugins/iflow-search/README.md`](plugins/iflow-search/README.md).
 
 ## Workspace development
 

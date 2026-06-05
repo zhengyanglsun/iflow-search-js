@@ -16,10 +16,9 @@ it only when you need to track an upcoming pre-cut. Run
 `npm view @iflow-ai/search-mcp dist-tags --json` to read live state.
 
 The Official MCP Registry entry `io.github.zhengyanglsun/iflow-search`
-still tracks `0.1.0-pre.2` — the stable `0.1.0` republish is a separate
-maintainer step (see [Official MCP Registry](#official-mcp-registry) below).
-Installing from npm gets you `0.1.0` regardless; the registry is
-metadata-only.
+publishes `0.1.0` as the current `isLatest` version (`0.1.0-pre.2` remains
+visible only as a historical entry — see [Official MCP Registry](#official-mcp-registry)
+below). The registry is metadata-only; the package itself installs from npm.
 
 - **Transport:** stdio only. No SSE, no streamable HTTP, no WebSocket in this
   release.
@@ -44,7 +43,7 @@ This server is listed in the [Official MCP Registry](https://registry.modelconte
 
 - **Registry name:** `io.github.zhengyanglsun/iflow-search`
 - **npm package:** `@iflow-ai/search-mcp` on dist-tag `latest` (`0.1.0`)
-- **Registry-tracked version:** `0.1.0-pre.2` — stable `0.1.0` republish to the registry is pending; npm is the source of truth for what installs.
+- **Registry-tracked version:** `0.1.0` (`isLatest: true`, `status: active`). `0.1.0-pre.2` remains as a historical entry only.
 - **Transport:** `stdio`
 
 The registry stores metadata only — the package itself still installs from npm. MCP clients launch the server with `npx -y @iflow-ai/search-mcp`, which resolves the current stable release (`0.1.0`), or pin a concrete version (e.g. `@iflow-ai/search-mcp@0.1.0`) for reproducibility. `@next` is still available for pre-cut testing.
