@@ -28,15 +28,18 @@ The three tool names, input shapes, and output shapes mirror the corresponding t
 
 ## Install (from a Claude Code marketplace)
 
-This plugin is intended for the official [`anthropics/claude-plugins-official`](https://github.com/anthropics/claude-plugins-official) directory. Submission is in progress — until it lands, use the local-development path below.
+This plugin is being submitted to Anthropic's community plugin marketplace, [`anthropics/claude-plugins-community`](https://github.com/anthropics/claude-plugins-community). Submission is in progress and the plugin is **not yet publicly listed** there — until it lands, use the local-development path below.
 
-When listed, install will be:
+After approval and the nightly sync to the community catalog, install will be:
 
-```text
-/plugin install iflow-search@claude-plugins-official
+```bash
+/plugin marketplace add anthropics/claude-plugins-community
+/plugin install iflow-search@claude-community
 ```
 
-(or browse via `/plugin > Discover`).
+(or browse via `/plugin > Discover`.) The above commands become valid only once the submission is approved and synced.
+
+`claude-plugins-official` is a separately-curated Anthropic marketplace — the standard plugin-directory submission form does not add plugins there, so it is not the target of this submission.
 
 ## Install (local development / pre-submission testing)
 
